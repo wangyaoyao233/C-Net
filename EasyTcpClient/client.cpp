@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // inet_ntoa()
+#define _CRT_SECURE_NO_WARNINGS // strcpy()
 #include <WinSock2.h>
 #include <Windows.h>
 #include <iostream>
@@ -9,7 +10,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 struct DataHeader
@@ -18,22 +21,38 @@ struct DataHeader
 	short cmd;
 };
 
-struct Login
+struct Login :public DataHeader
 {
+	Login() {
+		this->dataLen = sizeof(Login);
+		this->cmd = CMD_LOGIN;
+	}
 	char userName[32];
 	char password[32];
 };
-struct LoginResult
+struct LoginResult :public DataHeader
 {
+	LoginResult() {
+		this->dataLen = sizeof(LoginResult);
+		this->cmd = CMD_LOGIN_RESULT;
+	}
 	int result;
 };
 
-struct Logout
+struct Logout :public DataHeader
 {
+	Logout() {
+		this->dataLen = sizeof(Logout);
+		this->cmd = CMD_LOGOUT;
+	}
 	char userName[32];
 };
-struct LogoutResult
+struct LogoutResult :public DataHeader
 {
+	LogoutResult() {
+		this->dataLen = sizeof(LogoutResult);
+		this->cmd = CMD_LOGOUT_RESULT;
+	}
 	int result;
 };
 
@@ -67,30 +86,23 @@ int main()
 			break;
 		}
 		else if (0 == strcmp(cmdBuf, "Login")) {
-			// send msg header
-			DataHeader header = { sizeof(Login),CMD_LOGIN };
-			send(_sock, (const char*)&header, sizeof(DataHeader), 0);
-			// send msg body
-			Login login = { "client", "4567" };
+			// send msg
+			Login login;
+			strcpy(login.userName, "client");
+			strcpy(login.password, "4567");
 			send(_sock, (const char*)&login, sizeof(Login), 0);
-			// recv msg header
-			DataHeader retHeader = {};
-			recv(_sock, (char*)&retHeader, sizeof(DataHeader), 0);
-			// recv msg body
+
+			// recv msg
 			LoginResult ret = {};
 			recv(_sock, (char*)&ret, sizeof(LoginResult), 0);
 			printf("Login result = %d\n", ret.result);
 		}
 		else if (0 == strcmp(cmdBuf, "Logout")) {
-			// send msg header
-			DataHeader header = { sizeof(Logout),CMD_LOGOUT };
-			send(_sock, (const char*)&header, sizeof(DataHeader), 0);
 			// send msg body
-			Logout logout = { "client" };
+			Logout logout;
+			strcpy(logout.userName, "client");
 			send(_sock, (const char*)&logout, sizeof(Logout), 0);
-			// recv msg header
-			DataHeader retHeader = {};
-			recv(_sock, (char*)&retHeader, sizeof(DataHeader), 0);
+
 			// recv msg body
 			LogoutResult ret = {};
 			recv(_sock, (char*)&ret, sizeof(LogoutResult), 0);

@@ -9,7 +9,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 struct DataHeader
@@ -18,22 +20,38 @@ struct DataHeader
 	short cmd;
 };
 
-struct Login
+struct Login :public DataHeader
 {
+	Login() {
+		this->dataLen = sizeof(Login);
+		this->cmd = CMD_LOGIN;
+	}
 	char userName[32];
 	char password[32];
 };
-struct LoginResult
+struct LoginResult :public DataHeader
 {
+	LoginResult() {
+		this->dataLen = sizeof(LoginResult);
+		this->cmd = CMD_LOGIN_RESULT;
+	}
 	int result;
 };
 
-struct Logout
+struct Logout :public DataHeader
 {
+	Logout() {
+		this->dataLen = sizeof(Logout);
+		this->cmd = CMD_LOGOUT;
+	}
 	char userName[32];
 };
-struct LogoutResult
+struct LogoutResult :public DataHeader
 {
+	LogoutResult() {
+		this->dataLen = sizeof(LogoutResult);
+		this->cmd = CMD_LOGOUT_RESULT;
+	}
 	int result;
 };
 
@@ -86,7 +104,6 @@ int main()
 			printf("client quit..\n");
 			break;
 		}
-		printf("recv cmd = %d\n", header.cmd);
 
 		switch (header.cmd)
 		{
@@ -94,13 +111,12 @@ int main()
 		{
 			// recv msg body
 			Login login = {};
-			recv(_clientSock, (char*)&login, sizeof(Login), 0);
+			recv(_clientSock, (char*)&login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
 
 			printf("Login: userName = %s, passWord = %s\n", login.userName, login.password);
-			// send msg header
-			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
 			// send msg body
-			LoginResult ret = { 1 };
+			LoginResult ret;
+			ret.result = 1;
 			send(_clientSock, (const char*)&ret, sizeof(LoginResult), 0);
 		}
 			break;
@@ -108,13 +124,12 @@ int main()
 		{
 			// recv msg body
 			Logout logout = {};
-			recv(_clientSock, (char*)&logout, sizeof(Logout), 0);
+			recv(_clientSock, (char*)&logout + sizeof(DataHeader), sizeof(Logout) - sizeof(DataHeader), 0);
 
 			printf("Logout: userName = %s\n", logout.userName);
-			// send msg header
-			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
 			// send msg body
-			LogoutResult ret = { 1 };
+			LogoutResult ret;
+			ret.result = 1;
 			send(_clientSock, (const char*)&ret, sizeof(LogoutResult), 0);
 		}
 			break;
