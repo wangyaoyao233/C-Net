@@ -30,6 +30,16 @@ int main()
 
 	while (true)
 	{
+		char cmdBuf[256] = {};
+		std::cin >> cmdBuf;
+		if (0 == strcmp(cmdBuf, "exit")) {
+			break;
+		}
+		else {
+			// send
+			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
+		}
+
 		// recv
 		char recvBuf[256] = {};
 		int len = recv(_sock, recvBuf, 256, 0);
@@ -39,8 +49,6 @@ int main()
 	
 	// close
 	closesocket(_sock);
-
-
 	WSACleanup();
 	return 0;
 }

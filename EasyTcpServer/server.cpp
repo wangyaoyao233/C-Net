@@ -37,19 +37,40 @@ int main()
 	int addrLen = sizeof(sockaddr_in);
 	SOCKET _clientSock = INVALID_SOCKET;
 
+	_clientSock = accept(_sock, (sockaddr*)&_clientAddr, &addrLen);
+	if (INVALID_SOCKET == _clientSock) {
+		printf("accept error..\n");
+	}
+	else {
+		printf("new client connect: socket = %d, IP = %s\n", (int)_clientSock, inet_ntoa(_clientAddr.sin_addr));
+	}
+
+	char recvBuf[256] = {};
+	
 	while (true)
 	{
-		_clientSock = accept(_sock, (sockaddr*)&_clientAddr, &addrLen);
-		if (INVALID_SOCKET == _clientSock) {
-			printf("accept error..\n");
+		int len = recv(_clientSock, recvBuf, 256, 0);
+		if (len <= 0) {
+			printf("client quit..\n");
+			break;
+		}
+		printf("recv msg = %s\n", recvBuf);
+
+		if (0 == strcmp(recvBuf, "GetName")) {
+			char sendBuf[] = "Server";
+			// send
+			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
+		}
+		else if (0 == strcmp(recvBuf, "GetAge")) {
+			char sendBuf[] = "4567";
+			// send
+			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
 		}
 		else {
-			printf("new client connect: IP = %s\n", inet_ntoa(_clientAddr.sin_addr));
+			char sendBuf[] = "???";
+			// send
+			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
 		}
-
-		// send
-		char msgBuf[] = "Hello, I'm Server.";
-		send(_clientSock, msgBuf, strlen(msgBuf) + 1, 0);
 	}
 
 
