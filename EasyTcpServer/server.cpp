@@ -6,6 +6,12 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
+struct DataPackage
+{
+	int age;
+	char name[32];
+};
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -56,15 +62,10 @@ int main()
 		}
 		printf("recv msg = %s\n", recvBuf);
 
-		if (0 == strcmp(recvBuf, "GetName")) {
-			char sendBuf[] = "Server";
+		if (0 == strcmp(recvBuf, "GetInfo")) {
+			DataPackage dp = {4567, "Server"};			
 			// send
-			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
-		}
-		else if (0 == strcmp(recvBuf, "GetAge")) {
-			char sendBuf[] = "4567";
-			// send
-			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
+			send(_clientSock, (const char*)&dp, sizeof(DataPackage), 0);
 		}
 		else {
 			char sendBuf[] = "???";
@@ -76,8 +77,6 @@ int main()
 
 	// close
 	closesocket(_sock);
-
-
 	WSACleanup();
 	return 0;
 }

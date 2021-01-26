@@ -6,6 +6,12 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
+struct DataPackage
+{
+	int age;
+	char name[32];
+};
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -43,8 +49,10 @@ int main()
 		// recv
 		char recvBuf[256] = {};
 		int len = recv(_sock, recvBuf, 256, 0);
-		if(len > 0)
-			printf("%s\n", recvBuf);
+		if (len > 0) {
+			DataPackage* dp = (DataPackage*)recvBuf;
+			printf("name = %s, age = %d\n", dp->name, dp->age);
+		}			
 	}
 	
 	// close
