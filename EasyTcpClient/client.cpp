@@ -6,10 +6,35 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-struct DataPackage
+enum CMD
 {
-	int age;
-	char name[32];
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+struct DataHeader
+{
+	short dataLen;
+	short cmd;
+};
+
+struct Login
+{
+	char userName[32];
+	char password[32];
+};
+struct LoginResult
+{
+	int result;
+};
+
+struct Logout
+{
+	char userName[32];
+};
+struct LogoutResult
+{
+	int result;
 };
 
 int main()
@@ -41,18 +66,42 @@ int main()
 		if (0 == strcmp(cmdBuf, "exit")) {
 			break;
 		}
+		else if (0 == strcmp(cmdBuf, "Login")) {
+			// send msg header
+			DataHeader header = { sizeof(Login),CMD_LOGIN };
+			send(_sock, (const char*)&header, sizeof(DataHeader), 0);
+			// send msg body
+			Login login = { "client", "4567" };
+			send(_sock, (const char*)&login, sizeof(Login), 0);
+			// recv msg header
+			DataHeader retHeader = {};
+			recv(_sock, (char*)&retHeader, sizeof(DataHeader), 0);
+			// recv msg body
+			LoginResult ret = {};
+			recv(_sock, (char*)&ret, sizeof(LoginResult), 0);
+			printf("Login result = %d\n", ret.result);
+		}
+		else if (0 == strcmp(cmdBuf, "Logout")) {
+			// send msg header
+			DataHeader header = { sizeof(Logout),CMD_LOGOUT };
+			send(_sock, (const char*)&header, sizeof(DataHeader), 0);
+			// send msg body
+			Logout logout = { "client" };
+			send(_sock, (const char*)&logout, sizeof(Logout), 0);
+			// recv msg header
+			DataHeader retHeader = {};
+			recv(_sock, (char*)&retHeader, sizeof(DataHeader), 0);
+			// recv msg body
+			LogoutResult ret = {};
+			recv(_sock, (char*)&ret, sizeof(LogoutResult), 0);
+			printf("Logout result = %d\n", ret.result);
+		}
 		else {
 			// send
-			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
+			printf("unknown cmd..\n");
 		}
 
-		// recv
-		char recvBuf[256] = {};
-		int len = recv(_sock, recvBuf, 256, 0);
-		if (len > 0) {
-			DataPackage* dp = (DataPackage*)recvBuf;
-			printf("name = %s, age = %d\n", dp->name, dp->age);
-		}			
+			
 	}
 	
 	// close

@@ -6,10 +6,35 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-struct DataPackage
+enum CMD
 {
-	int age;
-	char name[32];
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+struct DataHeader
+{
+	short dataLen;
+	short cmd;
+};
+
+struct Login
+{
+	char userName[32];
+	char password[32];
+};
+struct LoginResult
+{
+	int result;
+};
+
+struct Logout
+{
+	char userName[32];
+};
+struct LogoutResult
+{
+	int result;
 };
 
 int main()
@@ -51,29 +76,58 @@ int main()
 		printf("new client connect: socket = %d, IP = %s\n", (int)_clientSock, inet_ntoa(_clientAddr.sin_addr));
 	}
 
-	char recvBuf[256] = {};
 	
 	while (true)
 	{
-		int len = recv(_clientSock, recvBuf, 256, 0);
+		// recv msg header
+		DataHeader header = {};
+		int len = recv(_clientSock, (char*)&header, sizeof(DataHeader), 0);
 		if (len <= 0) {
 			printf("client quit..\n");
 			break;
 		}
-		printf("recv msg = %s\n", recvBuf);
+		printf("recv cmd = %d\n", header.cmd);
 
-		if (0 == strcmp(recvBuf, "GetInfo")) {
-			DataPackage dp = {4567, "Server"};			
-			// send
-			send(_clientSock, (const char*)&dp, sizeof(DataPackage), 0);
+		switch (header.cmd)
+		{
+		case CMD_LOGIN:
+		{
+			// recv msg body
+			Login login = {};
+			recv(_clientSock, (char*)&login, sizeof(Login), 0);
+
+			printf("Login: userName = %s, passWord = %s\n", login.userName, login.password);
+			// send msg header
+			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
+			// send msg body
+			LoginResult ret = { 1 };
+			send(_clientSock, (const char*)&ret, sizeof(LoginResult), 0);
 		}
-		else {
-			char sendBuf[] = "???";
-			// send
-			send(_clientSock, sendBuf, strlen(sendBuf) + 1, 0);
+			break;
+		case CMD_LOGOUT:
+		{
+			// recv msg body
+			Logout logout = {};
+			recv(_clientSock, (char*)&logout, sizeof(Logout), 0);
+
+			printf("Logout: userName = %s\n", logout.userName);
+			// send msg header
+			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
+			// send msg body
+			LogoutResult ret = { 1 };
+			send(_clientSock, (const char*)&ret, sizeof(LogoutResult), 0);
 		}
+			break;
+		default:
+		{
+			header.cmd = CMD_ERROR;
+			header.dataLen = 0;
+			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
+		}
+			break;
+		}
+		
 	}
-
 
 	// close
 	closesocket(_sock);
