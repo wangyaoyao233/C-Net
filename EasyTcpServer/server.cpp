@@ -1,11 +1,25 @@
+#ifdef _WIN32
+
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // inet_ntoa()
+#define _CRT_SECURE_NO_WARNINGS // strcpy()
 #include <WinSock2.h>
 #include <Windows.h>
-#include <iostream>
-#include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
+#else
+#define SOCKET int
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+#include <unistd.h> // uni std
+#include <arpa/inet.h> // winsock2.h
+#endif // _WIN32
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace std;
 
 enum CMD
 {
@@ -77,7 +91,7 @@ int Processor(SOCKET _clientSock)
 	DataHeader* header = (DataHeader*)recvBuf;
 
 	if (len <= 0) {
-		printf("client<%d> quit..\n", (int)_clientSock);
+		printf("client<%d> quit..", (int)_clientSock);
 		return -1;
 	}
 
@@ -121,9 +135,11 @@ int Processor(SOCKET _clientSock)
 
 int main()
 {
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);
 	WSADATA dat;
 	WSAStartup(ver, &dat);
+#endif // _WIN32
 
 	// socket
 	SOCKET _sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -135,7 +151,11 @@ int main()
 	sockaddr_in _sin = {};
 	_sin.sin_family = AF_INET;
 	_sin.sin_port = htons(4567);//host to net ushort
+#ifdef _WIN32
 	_sin.sin_addr.S_un.S_addr = INADDR_ANY;//inet_addr("127.0.0.1");
+#else
+	_sin.sin_addr.s_addr = INADDR_ANY;//inet_addr("127.0.0.1");
+#endif // _WIN32
 	if (SOCKET_ERROR == bind(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in))) {
 		printf("bind error...\n");
 	}
@@ -145,9 +165,6 @@ int main()
 		printf("listen error...\n");
 	}
 
-
-
-	
 	while (true)
 	{
 		// select
@@ -162,8 +179,12 @@ int main()
 		FD_SET(_sock, &fdWrite);
 		FD_SET(_sock, &fdExcp);
 
+		int maxSock = _sock;
 		for (int i = 0; i < g_Clients.size(); i++) {
 			FD_SET(g_Clients[i], &fdRead);
+			if (g_Clients[i] > maxSock) {
+				maxSock = g_Clients[i];
+			}
 		}
 
 		timeval t{ 0,0 };
@@ -171,7 +192,7 @@ int main()
 		/// nfds 是一个整数值, 是指fd_set集合中所有描述符(socket)的范围, 而不是数量, 即是所有文件描述符的最大值+1
 		/// </summary>
 		/// <returns></returns>
-		int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExcp, &t);
+		int ret = select(maxSock + 1, &fdRead, &fdWrite, &fdExcp, &t);
 		if (ret < 0) {
 			printf("select quit..\n");
 			break;
@@ -204,12 +225,13 @@ int main()
 
 		}
 
-
-		for (int i = 0; i < fdRead.fd_count; ++i) {
-			if (-1 == Processor(fdRead.fd_array[i])) {
-				auto iter = std::find(g_Clients.begin(), g_Clients.end(), fdRead.fd_array[i]);
-				if (iter != g_Clients.end()) {
-					g_Clients.erase(iter);
+		for (int i = 0; i < g_Clients.size(); i++) {
+			if (FD_ISSET(g_Clients[i], &fdRead)) {
+				if (-1 == Processor(g_Clients[i])) {
+					auto iter = g_Clients.begin() + i;
+					if (iter != g_Clients.end()) {
+						g_Clients.erase(iter);
+					}
 				}
 			}
 		}
@@ -217,12 +239,19 @@ int main()
 		
 	}
 
+	// close
+#ifdef _WIN32
 	for (int i = 0; i < g_Clients.size(); i++) {
 		closesocket(g_Clients[i]);
 	}
-
-	// close
 	closesocket(_sock);
 	WSACleanup();
+#else
+	for (int i = 0; i < g_Clients.size(); i++) {
+		close(g_Clients[i]);
+	}
+	close(_sock);
+#endif // _WIN32
+
 	return 0;
 }
