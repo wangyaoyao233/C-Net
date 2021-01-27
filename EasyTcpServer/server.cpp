@@ -91,7 +91,7 @@ int Processor(SOCKET _clientSock)
 	DataHeader* header = (DataHeader*)recvBuf;
 
 	if (len <= 0) {
-		printf("client<%d> quit..", (int)_clientSock);
+		printf("client<%d> quit..\n", (int)_clientSock);
 		return -1;
 	}
 
