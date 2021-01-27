@@ -21,6 +21,8 @@
 #include <string>
 #include "Message.hpp"
 
+#define RECV_BUFF_SIZE (10240)
+
 class EasyTcpClient
 {
 public:
@@ -123,24 +125,36 @@ public:
 		return INVALID_SOCKET != _sock;
 	}
 
+	char _recvBuf[RECV_BUFF_SIZE] = {}; // recv buffer
+	char _msgBuf[RECV_BUFF_SIZE * 10] = {}; // the 2nd buffer
+	int _lastPos = 0;
 	// recv data
 	int RecvData(SOCKET _cSock)
 	{
-		// recvbuf
-		char recvBuf[1024] = {};
-		int len = recv(_cSock, recvBuf, sizeof(DataHeader), 0);
-		// recvbuf  to header
-		DataHeader* header = (DataHeader*)recvBuf;
-
+		// recv buffer
+		int len = recv(_cSock, _recvBuf, RECV_BUFF_SIZE, 0);
 		if (len <= 0) {
 			printf("client<%d> quit..\n", (int)_cSock);
 			return -1;
 		}
+		// copy to 2nd buffer
+		memcpy(_msgBuf + _lastPos, _recvBuf, len);
+		_lastPos += len;
 
-		// recvbuf to msg
-		recv(_cSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
-
-		OnNetMsg(header);
+		while(_lastPos >= sizeof(DataHeader)){
+			// recvbuf  to header
+			DataHeader* header = (DataHeader*)_msgBuf;
+			if (_lastPos >= header->dataLen) {
+				int size = _lastPos - header->dataLen;
+				OnNetMsg(header);
+				memcpy(_msgBuf, _msgBuf + header->dataLen, size);
+				_lastPos = size;
+			}
+			else {
+				break;
+			}
+		}
+	
 		return 0;
 	}
 
@@ -168,6 +182,7 @@ public:
 		break;
 		default:
 		{
+			printf("Unknow msg..\n");
 		}
 		break;
 		}
