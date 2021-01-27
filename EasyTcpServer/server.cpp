@@ -13,7 +13,8 @@ enum CMD
 	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
 	CMD_LOGOUT_RESULT,
-	CMD_ERROR
+	CMD_ERROR,
+	CMD_NEWUSER_JOIN
 };
 struct DataHeader
 {
@@ -56,6 +57,15 @@ struct LogoutResult :public DataHeader
 	int result;
 };
 
+struct NewUserJoin :public DataHeader
+{
+	NewUserJoin() {
+		this->dataLen = sizeof(NewUserJoin);
+		this->cmd = CMD_NEWUSER_JOIN;
+	}
+	int sock;
+};
+
 std::vector<SOCKET> g_Clients;
 
 int Processor(SOCKET _clientSock)
@@ -67,7 +77,7 @@ int Processor(SOCKET _clientSock)
 	DataHeader* header = (DataHeader*)recvBuf;
 
 	if (len <= 0) {
-		printf("client quit..\n");
+		printf("client<%d> quit..\n", (int)_clientSock);
 		return -1;
 	}
 
@@ -79,7 +89,7 @@ int Processor(SOCKET _clientSock)
 		recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
 		Login* login = (Login*)recvBuf;
 
-		printf("Login: userName = %s, passWord = %s\n", login->userName, login->password);
+		printf("client<%d> Login: userName = %s, passWord = %s\n", (int)_clientSock, login->userName, login->password);
 		// send msg
 		LoginResult ret;
 		ret.result = 1;
@@ -92,7 +102,7 @@ int Processor(SOCKET _clientSock)
 		recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
 		Logout* logout = (Logout*)recvBuf;
 
-		printf("Logout: userName = %s\n", logout->userName);
+		printf("client<%d> Logout: userName = %s\n", (int)_clientSock, logout->userName);
 		// send msg
 		LogoutResult ret;
 		ret.result = 1;
@@ -181,8 +191,17 @@ int main()
 			}
 			else {
 				printf("new client connect: socket = %d, IP = %s\n", (int)_clientSock, inet_ntoa(_clientAddr.sin_addr));
+
+				NewUserJoin userJoin{};
+				userJoin.sock = _clientSock;
+				for (int i = 0; i < g_Clients.size(); i++) {
+					send(g_Clients[i], (const char*)&userJoin, sizeof(NewUserJoin), 0);
+				}
+
 				g_Clients.push_back(_clientSock);
 			}
+
+
 		}
 
 

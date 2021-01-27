@@ -13,7 +13,8 @@ enum CMD
 	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
 	CMD_LOGOUT_RESULT,
-	CMD_ERROR
+	CMD_ERROR,
+	CMD_NEWUSER_JOIN
 };
 struct DataHeader
 {
@@ -56,6 +57,65 @@ struct LogoutResult :public DataHeader
 	int result;
 };
 
+struct NewUserJoin :public DataHeader
+{
+	NewUserJoin() {
+		this->dataLen = sizeof(NewUserJoin);
+		this->cmd = CMD_NEWUSER_JOIN;
+	}
+	int sock;
+};
+
+int Processor(SOCKET _clientSock)
+{
+	// recvbuf
+	char recvBuf[1024] = {};
+	int len = recv(_clientSock, recvBuf, sizeof(DataHeader), 0);
+	// recvbuf  to header
+	DataHeader* header = (DataHeader*)recvBuf;
+
+	if (len <= 0) {
+		printf("client<%d> quit..\n", (int)_clientSock);
+		return -1;
+	}
+
+	switch (header->cmd)
+	{
+	case CMD_LOGIN_RESULT:
+	{
+		// recvbuf to msg
+		recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
+		LoginResult* ret = (LoginResult*)recvBuf;
+
+		printf("Login result = %d\n", ret->result);
+	}
+	break;
+	case CMD_LOGOUT_RESULT:
+	{
+		// recvbuf to msg
+		recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
+		LogoutResult* ret = (LogoutResult*)recvBuf;
+
+		printf("Logout result = %d\n", ret->result);
+	}
+	break;
+	case CMD_NEWUSER_JOIN:
+	{
+		// recvbuf to msg
+		recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
+		NewUserJoin* ret = (NewUserJoin*)recvBuf;
+
+		printf("New user join, socket = <%d>\n", ret->sock);
+	}
+		break;
+	default:
+	{
+	}
+	break;
+	}
+	return 0;
+}
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -80,39 +140,31 @@ int main()
 
 	while (true)
 	{
-		char cmdBuf[256] = {};
-		std::cin >> cmdBuf;
-		if (0 == strcmp(cmdBuf, "exit")) {
+		fd_set fdRead{};
+		FD_ZERO(&fdRead);
+		FD_SET(_sock, &fdRead);
+
+		timeval t{ 0,0 };
+		int ret = select(_sock, &fdRead, nullptr, nullptr, &t);
+		if (ret < 0) {
+			printf("select quit..1\n");
 			break;
 		}
-		else if (0 == strcmp(cmdBuf, "Login")) {
-			// send msg
-			Login login;
-			strcpy(login.userName, "client");
-			strcpy(login.password, "4567");
-			send(_sock, (const char*)&login, sizeof(Login), 0);
 
-			// recv msg
-			LoginResult ret = {};
-			recv(_sock, (char*)&ret, sizeof(LoginResult), 0);
-			printf("Login result = %d\n", ret.result);
-		}
-		else if (0 == strcmp(cmdBuf, "Logout")) {
-			// send msg body
-			Logout logout;
-			strcpy(logout.userName, "client");
-			send(_sock, (const char*)&logout, sizeof(Logout), 0);
+		if (FD_ISSET(_sock, &fdRead)) {
+			FD_CLR(_sock, &fdRead);
 
-			// recv msg body
-			LogoutResult ret = {};
-			recv(_sock, (char*)&ret, sizeof(LogoutResult), 0);
-			printf("Logout result = %d\n", ret.result);
-		}
-		else {
-			// send
-			printf("unknown cmd..\n");
+			if (-1 == Processor(_sock)) {
+				printf("select quit..2\n");
+				break;
+			}
 		}
 
+		Login login;
+		strcpy(login.userName, "client");
+		strcpy(login.password, "4567");
+		send(_sock, (const char*)&login, sizeof(Login), 0);
+		Sleep(1000);
 			
 	}
 	
