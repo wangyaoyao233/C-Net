@@ -97,24 +97,27 @@ int main()
 	
 	while (true)
 	{
-		// recv msg header
-		DataHeader header = {};
-		int len = recv(_clientSock, (char*)&header, sizeof(DataHeader), 0);
+		// recvbuf
+		char recvBuf[1024] = {};
+		int len = recv(_clientSock, recvBuf, sizeof(DataHeader), 0);
+		// recvbuf  to header
+		DataHeader* header = (DataHeader*)recvBuf;	
+		
 		if (len <= 0) {
 			printf("client quit..\n");
 			break;
 		}
 
-		switch (header.cmd)
+		switch (header->cmd)
 		{
 		case CMD_LOGIN:
 		{
-			// recv msg body
-			Login login = {};
-			recv(_clientSock, (char*)&login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
+			// recvbuf to msg
+			recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
+			Login* login = (Login*)recvBuf;
 
-			printf("Login: userName = %s, passWord = %s\n", login.userName, login.password);
-			// send msg body
+			printf("Login: userName = %s, passWord = %s\n", login->userName, login->password);
+			// send msg
 			LoginResult ret;
 			ret.result = 1;
 			send(_clientSock, (const char*)&ret, sizeof(LoginResult), 0);
@@ -122,12 +125,12 @@ int main()
 			break;
 		case CMD_LOGOUT:
 		{
-			// recv msg body
-			Logout logout = {};
-			recv(_clientSock, (char*)&logout + sizeof(DataHeader), sizeof(Logout) - sizeof(DataHeader), 0);
+			// recvbuf to msg
+			recv(_clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
+			Logout* logout = (Logout*)recvBuf;
 
-			printf("Logout: userName = %s\n", logout.userName);
-			// send msg body
+			printf("Logout: userName = %s\n", logout->userName);
+			// send msg
 			LogoutResult ret;
 			ret.result = 1;
 			send(_clientSock, (const char*)&ret, sizeof(LogoutResult), 0);
@@ -135,8 +138,7 @@ int main()
 			break;
 		default:
 		{
-			header.cmd = CMD_ERROR;
-			header.dataLen = 0;
+			DataHeader header = { 0, CMD_ERROR };
 			send(_clientSock, (const char*)&header, sizeof(DataHeader), 0);
 		}
 			break;
