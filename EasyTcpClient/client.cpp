@@ -4,8 +4,11 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #include <iostream>
+#include <thread>
 
 #pragma comment(lib, "ws2_32.lib")
+
+using namespace std;
 
 enum CMD
 {
@@ -66,6 +69,8 @@ struct NewUserJoin :public DataHeader
 	int sock;
 };
 
+bool g_Run = true;
+
 int Processor(SOCKET _clientSock)
 {
 	// recvbuf
@@ -116,6 +121,27 @@ int Processor(SOCKET _clientSock)
 	return 0;
 }
 
+void ThreadCmd(SOCKET _sock)
+{
+	while (true)
+	{
+		char cmdBuf[256];
+		cin >> cmdBuf;
+
+		if (0 == strcmp(cmdBuf, "exit")) {
+			g_Run = false;
+			break;
+		}
+		else if (0 == strcmp(cmdBuf, "Login")) {
+			Login login;
+			strcpy(login.userName, "client");
+			strcpy(login.password, "4567");
+			send(_sock, (const char*)&login, sizeof(Login), 0);
+		}
+	}
+
+}
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -138,7 +164,10 @@ int main()
 		printf("connect error..\n");
 	}
 
-	while (true)
+	// thread
+	thread t1(ThreadCmd, _sock);
+
+	while (g_Run)
 	{
 		fd_set fdRead{};
 		FD_ZERO(&fdRead);
@@ -160,13 +189,10 @@ int main()
 			}
 		}
 
-		Login login;
-		strcpy(login.userName, "client");
-		strcpy(login.password, "4567");
-		send(_sock, (const char*)&login, sizeof(Login), 0);
-		Sleep(1000);
 			
 	}
+	
+	t1.join();
 	
 	// close
 	closesocket(_sock);
