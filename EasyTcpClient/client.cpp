@@ -1,12 +1,23 @@
+#ifdef _WIN32
+
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // inet_ntoa()
 #define _CRT_SECURE_NO_WARNINGS // strcpy()
 #include <WinSock2.h>
 #include <Windows.h>
-#include <iostream>
-#include <thread>
 
 #pragma comment(lib, "ws2_32.lib")
+#else
+#define SOCKET int
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+#include <unistd.h> // uni std
+#include <arpa/inet.h> // winsock2.h
+#endif // _WIN32
+
+#include <iostream>
+#include <string>
+#include <thread> // std::thread
 
 using namespace std;
 
@@ -144,9 +155,12 @@ void ThreadCmd(SOCKET _sock)
 
 int main()
 {
+
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);
 	WSADATA dat;
 	WSAStartup(ver, &dat);
+#endif // _WIN32
 
 	// socket
 	SOCKET _sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -158,7 +172,11 @@ int main()
 	sockaddr_in _sin = {};
 	_sin.sin_family = AF_INET;
 	_sin.sin_port = htons(4567);//host to net ushort
+#ifdef _WIN32
 	_sin.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+#else
+	_sin.sin_addr.s_addr = inet_addr("127.0.0.1");
+#endif // _WIN32
 	int ret = connect(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 	if (SOCKET_ERROR == ret) {
 		printf("connect error..\n");
@@ -174,7 +192,7 @@ int main()
 		FD_SET(_sock, &fdRead);
 
 		timeval t{ 0,0 };
-		int ret = select(_sock, &fdRead, nullptr, nullptr, &t);
+		int ret = select(_sock + 1, &fdRead, nullptr, nullptr, &t);
 		if (ret < 0) {
 			printf("select quit..1\n");
 			break;
@@ -195,7 +213,12 @@ int main()
 	t1.join();
 	
 	// close
+#ifdef _WIN32
 	closesocket(_sock);
 	WSACleanup();
+#else
+	close(_sock);
+#endif // _WIN32
+
 	return 0;
 }
