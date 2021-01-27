@@ -100,6 +100,7 @@ public:
 			int ret = select(_sock + 1, &fdRead, nullptr, nullptr, &t);
 			if (ret < 0) {
 				printf("<socket= %d>select quit..1\n", (int)_sock);
+				Close();
 				return false;
 			}
 
@@ -108,6 +109,7 @@ public:
 
 				if (-1 == RecvData(_sock)) {
 					printf("<socket= %d>select quit..2\n", (int)_sock);
+					Close();
 					return false;
 				}
 			}
