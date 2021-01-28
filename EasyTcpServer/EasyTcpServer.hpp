@@ -22,6 +22,33 @@
 #include <vector>
 #include "Message.hpp"
 
+#define RECV_BUFF_SIZE 10240
+
+class ClientSocket
+{
+public:
+	ClientSocket(SOCKET sockfd = INVALID_SOCKET)
+	{
+		_sockfd = sockfd;
+		memset(_msgBuf, 0, sizeof(_msgBuf));
+		_lastPos = 0;
+	}
+	~ClientSocket()
+	{
+
+	}
+
+	SOCKET Sockfd() { return _sockfd; }
+	char* MsgBuf() { return _msgBuf; }
+	int GetLastPos() { return _lastPos; }
+	void SetLastPos(int pos) { _lastPos = pos; }
+
+private:
+	SOCKET _sockfd; // fd_set file desc set
+	char _msgBuf[RECV_BUFF_SIZE * 10] = {}; // the 2nd buffer
+	int _lastPos = 0;
+};
+
 class EasyTcpServer
 {
 public:
@@ -60,18 +87,21 @@ public:
 		if (INVALID_SOCKET != _sock) {
 			// close
 #ifdef _WIN32
-			for (int i = 0; i < _Clients.size(); i++) {
-				closesocket(_Clients[i]);
+			for (int i = 0; i < _clients.size(); i++) {
+				closesocket(_clients[i]->Sockfd());
+				delete _clients[i];
 			}
 			closesocket(_sock);
 			WSACleanup();
 #else
 			for (int i = 0; i < g_Clients.size(); i++) {
-				close(g_Clients[i]);
+				close(_clients[i]->Sockfd());
+				delete _clients[i];
 			}
 			close(_sock);
 #endif // _WIN32
 			_sock = INVALID_SOCKET;
+			_clients.clear();
 		}
 	}
 
@@ -127,24 +157,22 @@ public:
 		// accept
 		sockaddr_in clientAddr = {};
 		int addrLen = sizeof(sockaddr_in);
-		SOCKET clientSock = INVALID_SOCKET;
+		SOCKET cSock = INVALID_SOCKET;
 
-		clientSock = accept(_sock, (sockaddr*)&clientAddr, &addrLen);
-		if (INVALID_SOCKET == clientSock) {
+		cSock = accept(_sock, (sockaddr*)&clientAddr, &addrLen);
+		if (INVALID_SOCKET == cSock) {
 			printf("accept error..\n");
 		}
 		else {
-			printf("new client connect: socket = %d, IP = %s\n", (int)clientSock, inet_ntoa(clientAddr.sin_addr));
+			printf("new client connect: socket = %d, IP = %s\n", (int)cSock, inet_ntoa(clientAddr.sin_addr));
 
 			NewUserJoin userJoin{};
-			userJoin.sock = clientSock;
-			for (int i = 0; i < _Clients.size(); i++) {
-				send(_Clients[i], (const char*)&userJoin, sizeof(NewUserJoin), 0);
-			}
+			userJoin.sock = cSock;
+			this->SendDataToAll(&userJoin);
 
-			_Clients.push_back(clientSock);
+			_clients.push_back(new ClientSocket(cSock));
 		}
-		return clientSock;
+		return cSock;
 	}
 
 
@@ -164,10 +192,10 @@ public:
 			FD_SET(_sock, &fdExcp);
 
 			int maxSock = _sock;
-			for (int i = 0; i < _Clients.size(); i++) {
-				FD_SET(_Clients[i], &fdRead);
-				if (_Clients[i] > maxSock) {
-					maxSock = _Clients[i];
+			for (int i = 0; i < _clients.size(); i++) {
+				FD_SET(_clients[i]->Sockfd(), &fdRead);
+				if (_clients[i]->Sockfd() > maxSock) {
+					maxSock = _clients[i]->Sockfd();
 				}
 			}
 
@@ -190,12 +218,13 @@ public:
 				this->Accept();
 			}
 
-			for (int i = 0; i < _Clients.size(); i++) {
-				if (FD_ISSET(_Clients[i], &fdRead)) {
-					if (-1 == this->RecvData(_Clients[i])) {
-						auto iter = _Clients.begin() + i;
-						if (iter != _Clients.end()) {
-							_Clients.erase(iter);
+			for (int i = 0; i < _clients.size(); i++) {
+				if (FD_ISSET(_clients[i]->Sockfd(), &fdRead)) {
+					if (-1 == this->RecvData(_clients[i])) {
+						auto iter = _clients.begin() + i;
+						if (iter != _clients.end()) {
+							delete _clients[i];
+							_clients.erase(iter);
 						}
 					}
 				}
@@ -211,30 +240,40 @@ public:
 		return INVALID_SOCKET != _sock;
 	}
 
-	int RecvData(SOCKET clientSock)
+	char _recvBuf[RECV_BUFF_SIZE] = {};
+	int RecvData(ClientSocket* client)
 	{
-		// recvbuf
-		char recvBuf[1024] = {};
-		int len = recv(clientSock, recvBuf, sizeof(DataHeader), 0);
-		// recvbuf  to header
-		DataHeader* header = (DataHeader*)recvBuf;
+		// recvbuf	
+		int len = recv(client->Sockfd(), _recvBuf, RECV_BUFF_SIZE, 0);
 		if (len <= 0) {
-			printf("client<%d> quit..\n", (int)clientSock);
+			printf("client<%d> quit..\n", (int)client->Sockfd());
 			return -1;
 		}
+		// copy to 2nd buffer
+		memcpy(client->MsgBuf() + client->GetLastPos(), _recvBuf, len);
+		client->SetLastPos(client->GetLastPos() + len);
 
-		// recvbuf to msg
-		recv(clientSock, recvBuf + sizeof(DataHeader), header->dataLen - sizeof(DataHeader), 0);
-
-		this->OnNetMsg(clientSock, header);
+		while (client->GetLastPos() >= sizeof(DataHeader)) {
+			// recvbuf  to header
+			DataHeader* header = (DataHeader*)client->MsgBuf();
+			if (client->GetLastPos() >= header->dataLen) {
+				int size = client->GetLastPos() - header->dataLen;
+				this->OnNetMsg(client->Sockfd(), header);
+				memcpy(client->MsgBuf(), client->MsgBuf() + header->dataLen, size);
+				client->SetLastPos(size);
+			}
+			else {
+				break;
+			}
+		}
 
 		return 0;
 	}
 
-	int SendData(SOCKET clientSock, DataHeader* header)
+	int SendData(SOCKET cSock, DataHeader* header)
 	{
 		if (IsRun() && header) {
-			return send(clientSock, (const char*)&header, header->dataLen, 0);
+			return send(cSock, (const char*)header, header->dataLen, 0);
 		}
 		return SOCKET_ERROR;
 	}
@@ -242,40 +281,39 @@ public:
 	void SendDataToAll(DataHeader* header)
 	{
 		if (IsRun() && header) {
-			for (int i = 0; i < _Clients.size(); i++) {	
-				SendData(_Clients[i], header);
+			for (int i = 0; i < _clients.size(); i++) {	
+				SendData(_clients[i]->Sockfd(), header);
 			}
 		}
 	}
 
-	virtual void OnNetMsg(SOCKET clientSock, DataHeader* header)
+	virtual void OnNetMsg(SOCKET cSock, DataHeader* header)
 	{
 		switch (header->cmd)
 		{
 		case CMD_LOGIN:
 		{
 			Login* login = (Login*)header;
-			printf("client<%d> Login: userName = %s, passWord = %s\n", (int)clientSock, login->userName, login->password);
+			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 			// send msg
 			LoginResult ret;
 			ret.result = 1;
-			send(clientSock, (const char*)&ret, sizeof(LoginResult), 0);
+			this->SendData(cSock, &ret);
 		}
 		break;
 		case CMD_LOGOUT:
 		{
 			Logout* logout = (Logout*)header;
-			printf("client<%d> Logout: userName = %s\n", (int)clientSock, logout->userName);
+			//printf("client<%d> Logout: userName = %s\n", (int)cSock, logout->userName);
 			// send msg
 			LogoutResult ret;
 			ret.result = 1;
-			send(clientSock, (const char*)&ret, sizeof(LogoutResult), 0);
+			this->SendData(cSock, &ret);
 		}
 		break;
 		default:
 		{
-			DataHeader header = { 0, CMD_ERROR };
-			send(clientSock, (const char*)&header, sizeof(DataHeader), 0);
+			
 		}
 		break;
 		}
@@ -283,5 +321,5 @@ public:
 
 private:
 	SOCKET _sock;
-	std::vector<SOCKET> _Clients;
+	std::vector<ClientSocket*> _clients;
 };

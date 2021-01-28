@@ -2,8 +2,8 @@
 #include <thread> // std::thread
 
 using namespace std;
-
-void ThreadCmd(EasyTcpClient* client)
+bool g_Run = true;
+void ThreadCmd()
 {
 	while (true)
 	{
@@ -11,37 +11,46 @@ void ThreadCmd(EasyTcpClient* client)
 		cin >> cmdBuf;
 
 		if (0 == strcmp(cmdBuf, "exit")) {
-			client->Close();
+			g_Run = false;
 			break;
 		}
-		else if (0 == strcmp(cmdBuf, "Login")) {
-			Login login;
-			strcpy(login.userName, "client");
-			strcpy(login.password, "4567");
-			client->SendData(&login);
-		}
 	}
-
 }
 
 int main()
 {
+	const int cCount = 10;// FD_SETSIZE - 1;
 
-	EasyTcpClient* client = new EasyTcpClient;
-	client->Init();
-	client->Connect("127.0.0.1", 4567);
-	
+	EasyTcpClient* client[cCount];
+
+	for (int i = 0; i < cCount; i++) {
+		client[i] = new EasyTcpClient;
+	}
+
+	for (int i = 0; i < cCount; i++) {
+		client[i]->Init();
+		client[i]->Connect("127.0.0.1", 4567);
+	}
 
 	// thread
-	thread t1(ThreadCmd, client);
+	thread t1(ThreadCmd);
 
-	while (client->IsRun())
+	Login login;
+	strcpy(login.userName, "client");
+	strcpy(login.password, "4567");
+
+	while (g_Run)
 	{
-		client->OnRun();		
+		for (int i = 0; i < cCount; i++) {
+			client[i]->SendData(&login);
+			client[i]->OnRun();
+		}			
+	}
+	for (int i = 0; i < cCount; i++) {
+		client[i]->Close(); 
+		delete client[i];
 	}
 	
-	client->Close();
-	delete client;
 	t1.join();
 	return 0;
 }

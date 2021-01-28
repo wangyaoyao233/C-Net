@@ -165,19 +165,19 @@ public:
 		case CMD_LOGIN_RESULT:
 		{
 			LoginResult* ret = (LoginResult*)header;
-			printf("Login result = %d\n", ret->result);
+			//printf("Login result = %d\n", ret->result);
 		}
 		break;
 		case CMD_LOGOUT_RESULT:
 		{
 			LogoutResult* ret = (LogoutResult*)header;
-			printf("Logout result = %d\n", ret->result);
+			//printf("Logout result = %d\n", ret->result);
 		}
 		break;
 		case CMD_NEWUSER_JOIN:
 		{
 			NewUserJoin* ret = (NewUserJoin*)header;
-			printf("New user join, socket = <%d>\n", ret->sock);
+			//printf("New user join, socket = <%d>\n", ret->sock);
 		}
 		break;
 		default:

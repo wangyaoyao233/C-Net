@@ -22,6 +22,7 @@ struct Login :public DataHeader
 	}
 	char userName[32];
 	char password[32];
+	char data[932];
 };
 struct LoginResult :public DataHeader
 {
@@ -30,6 +31,7 @@ struct LoginResult :public DataHeader
 		this->cmd = CMD_LOGIN_RESULT;
 	}
 	int result;
+	char data[992];
 };
 
 struct Logout :public DataHeader
