@@ -21,7 +21,7 @@
 #include <string>
 #include "Message.hpp"
 
-#define RECV_BUFF_SIZE (10240)
+#define RECV_BUFF_SIZE 10240
 
 class EasyTcpClient
 {
@@ -87,7 +87,7 @@ public:
 #endif // _WIN32
 		int ret = connect(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 		if (SOCKET_ERROR == ret) {
-			printf("connect error..\n");
+			printf("<socket = %d>,connect error..\n", (int)_sock);
 		}
 	}
 
@@ -101,7 +101,7 @@ public:
 			timeval t{ 0,0 };
 			int ret = select(_sock + 1, &fdRead, nullptr, nullptr, &t);
 			if (ret < 0) {
-				printf("<socket= %d>select quit..1\n", (int)_sock);
+				printf("<socket= %d>,select quit..1\n", (int)_sock);
 				Close();
 				return false;
 			}
@@ -134,7 +134,7 @@ public:
 		// recv buffer
 		int len = recv(_cSock, _recvBuf, RECV_BUFF_SIZE, 0);
 		if (len <= 0) {
-			printf("client<%d> quit..\n", (int)_cSock);
+			printf("<socket= %d>,client quit..\n", (int)_cSock);
 			return -1;
 		}
 		// copy to 2nd buffer

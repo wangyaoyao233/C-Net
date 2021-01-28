@@ -19,7 +19,7 @@ void ThreadCmd()
 
 int main()
 {
-	const int cCount = 10;// FD_SETSIZE - 1;
+	const int cCount = 1000;// FD_SETSIZE - 1;
 
 	EasyTcpClient* client[cCount];
 
@@ -43,7 +43,7 @@ int main()
 	{
 		for (int i = 0; i < cCount; i++) {
 			client[i]->SendData(&login);
-			client[i]->OnRun();
+			//client[i]->OnRun();
 		}			
 	}
 	for (int i = 0; i < cCount; i++) {

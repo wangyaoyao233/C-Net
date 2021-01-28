@@ -2,6 +2,7 @@
 
 #ifdef _WIN32
 
+#define FD_SETSIZE 1024
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // inet_ntoa()
 #define _CRT_SECURE_NO_WARNINGS // strcpy()
@@ -164,11 +165,7 @@ public:
 			printf("accept error..\n");
 		}
 		else {
-			printf("new client connect: socket = %d, IP = %s\n", (int)cSock, inet_ntoa(clientAddr.sin_addr));
-
-			NewUserJoin userJoin{};
-			userJoin.sock = cSock;
-			this->SendDataToAll(&userJoin);
+			printf("new client connect: socket = %d, IP = %s, nums = %d\n", (int)cSock, inet_ntoa(clientAddr.sin_addr), _clients.size());
 
 			_clients.push_back(new ClientSocket(cSock));
 		}
@@ -296,9 +293,9 @@ public:
 			Login* login = (Login*)header;
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 			// send msg
-			LoginResult ret;
-			ret.result = 1;
-			this->SendData(cSock, &ret);
+			//LoginResult ret;
+			//ret.result = 1;
+			//this->SendData(cSock, &ret);
 		}
 		break;
 		case CMD_LOGOUT:
@@ -306,9 +303,9 @@ public:
 			Logout* logout = (Logout*)header;
 			//printf("client<%d> Logout: userName = %s\n", (int)cSock, logout->userName);
 			// send msg
-			LogoutResult ret;
-			ret.result = 1;
-			this->SendData(cSock, &ret);
+			//LogoutResult ret;
+			//ret.result = 1;
+			//this->SendData(cSock, &ret);
 		}
 		break;
 		default:
