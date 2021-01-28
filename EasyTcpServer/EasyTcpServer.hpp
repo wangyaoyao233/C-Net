@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "Message.hpp"
+#include "TimeStamp.hpp"
 
 #define RECV_BUFF_SIZE 10240
 
@@ -56,6 +57,7 @@ public:
 	EasyTcpServer()
 	{
 		_sock = INVALID_SOCKET;
+		_recvCnt = 0;
 	}
 	~EasyTcpServer()
 	{
@@ -286,6 +288,14 @@ public:
 
 	virtual void OnNetMsg(SOCKET cSock, DataHeader* header)
 	{
+		_recvCnt++;
+		auto t1 = _time.GetElapsedTimeInSec();
+		if( t1 >= 1.0){
+			printf("time<%lf>,client nums<%d> recvCnt<%d>\n", t1, _clients.size(), _recvCnt);
+			_time.Update();
+			_recvCnt = 0;
+		}
+
 		switch (header->cmd)
 		{
 		case CMD_LOGIN:
@@ -319,4 +329,6 @@ public:
 private:
 	SOCKET _sock;
 	std::vector<ClientSocket*> _clients;
+	TimeStamp _time;
+	int _recvCnt;
 };
