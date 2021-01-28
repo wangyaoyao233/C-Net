@@ -215,6 +215,8 @@ public:
 				FD_CLR(_sock, &fdRead);
 
 				this->Accept();
+				// all clients connected, to recv data
+				return true;
 			}
 
 			for (int i = 0; i < _clients.size(); i++) {
