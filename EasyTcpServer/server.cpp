@@ -23,6 +23,7 @@ int main()
 	server->Init();
 	server->Bind(nullptr, 4567);
 	server->Listen(5);
+	server->Start();
 
 	std::thread t1(ThreadCmd);
 

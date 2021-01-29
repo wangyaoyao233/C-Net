@@ -190,10 +190,11 @@ public:
 
 
 	// send data
-	int SendData(DataHeader* header)
+	int SendData(DataHeader* header, int len)
 	{
 		if (IsRun() && header) {
-			return send(_sock, (const char*)header, header->dataLen, 0);
+			//return send(_sock, (const char*)header, header->dataLen, 0);
+			return send(_sock, (const char*)header, len, 0);
 		}
 		return SOCKET_ERROR;
 	}

@@ -17,8 +17,9 @@ void ThreadCmd()
 	}
 }
 
-const int cCount = 100;// FD_SETSIZE - 1;
+const int cCount = 1000;// FD_SETSIZE - 1;
 const int tCount = 4;
+const int mCount = 10;
 EasyTcpClient* client[cCount];
 
 void ThreadSend(int id)
@@ -34,17 +35,19 @@ void ThreadSend(int id)
 	for (int i = begin; i < end; i++) {
 		client[i]->Init();
 		client[i]->Connect("127.0.0.1", 4567);
-		printf("connect=%d\n", i);
+		printf("thread id=%d, connect=%d\n", id, i);
 	}
 
-	Login login;
-	strcpy(login.userName, "client");
-	strcpy(login.password, "4567");
-
+	Login login[mCount];
+	for (int i = 0; i < mCount; i++) {
+		strcpy(login[i].userName, "client");
+		strcpy(login[i].password, "4567");
+	}
+	const int len = sizeof(login);
 	while (g_Run)
 	{
 		for (int i = begin; i < end; i++) {
-			client[i]->SendData(&login);
+			client[i]->SendData(login, len);
 			//client[i]->OnRun();
 		}
 	}
