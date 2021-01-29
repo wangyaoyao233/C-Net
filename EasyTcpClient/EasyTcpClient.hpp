@@ -20,6 +20,7 @@
 #include <iostream>
 #include <string>
 #include "Message.hpp"
+#include "TimeStamp.hpp"
 
 #define RECV_BUFF_SIZE 10240
 
@@ -29,6 +30,7 @@ public:
 	EasyTcpClient()
 	{
 		_sock = INVALID_SOCKET;
+		_IsConnect = false;
 	}
 	virtual ~EasyTcpClient()
 	{
@@ -67,6 +69,7 @@ public:
 		close(_sock);
 #endif // _WIN32
 		_sock = INVALID_SOCKET;
+		_IsConnect = false;
 		}
 	}
 
@@ -89,6 +92,7 @@ public:
 		if (SOCKET_ERROR == ret) {
 			printf("<socket = %d>,connect error..\n", (int)_sock);
 		}
+		_IsConnect = true;
 	}
 
 	bool OnRun()
@@ -126,7 +130,7 @@ public:
 	}
 
 	char _recvBuf[RECV_BUFF_SIZE] = {}; // recv buffer
-	char _msgBuf[RECV_BUFF_SIZE * 10] = {}; // the 2nd buffer
+	char _msgBuf[RECV_BUFF_SIZE * 5] = {}; // the 2nd buffer
 	int _lastPos = 0;
 	// recv data
 	int RecvData(SOCKET _cSock)
@@ -164,19 +168,19 @@ public:
 		{
 		case CMD_LOGIN_RESULT:
 		{
-			LoginResult* ret = (LoginResult*)header;
+			//LoginResult* ret = (LoginResult*)header;
 			//printf("Login result = %d\n", ret->result);
 		}
 		break;
 		case CMD_LOGOUT_RESULT:
 		{
-			LogoutResult* ret = (LogoutResult*)header;
+			//LogoutResult* ret = (LogoutResult*)header;
 			//printf("Logout result = %d\n", ret->result);
 		}
 		break;
 		case CMD_NEWUSER_JOIN:
 		{
-			NewUserJoin* ret = (NewUserJoin*)header;
+			//NewUserJoin* ret = (NewUserJoin*)header;
 			//printf("New user join, socket = <%d>\n", ret->sock);
 		}
 		break;
@@ -192,12 +196,18 @@ public:
 	// send data
 	int SendData(DataHeader* header, int len)
 	{
+		int ret = SOCKET_ERROR;
 		if (IsRun() && header) {
 			//return send(_sock, (const char*)header, header->dataLen, 0);
-			return send(_sock, (const char*)header, len, 0);
+			ret = send(_sock, (const char*)header, len, 0);
+
+			if (SOCKET_ERROR == ret) {
+				Close();
+			}
 		}
-		return SOCKET_ERROR;
+		return ret;
 	}
 private:
 	SOCKET _sock;
+	bool _IsConnect;
 };

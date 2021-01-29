@@ -17,13 +17,32 @@ void ThreadCmd()
 	}
 }
 
+class MyServer :public EasyTcpServer
+{
+public:
+	virtual void OnNetLeave(ClientSocket* client)
+	{
+		_clientCnt--;
+	}
+
+	virtual void OnNetMsg(ClientSocket* client, DataHeader* header)
+	{
+		_recvCnt++;
+	}
+
+	virtual void OnNetJoin(ClientSocket* client)
+	{
+		_clientCnt++;
+	}
+};
+
 int main()
 {
 	EasyTcpServer* server = new EasyTcpServer;
 	server->Init();
 	server->Bind(nullptr, 4567);
 	server->Listen(5);
-	server->Start();
+	server->Start(4);
 
 	std::thread t1(ThreadCmd);
 

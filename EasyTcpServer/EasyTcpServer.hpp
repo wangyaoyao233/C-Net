@@ -28,12 +28,12 @@
 #include "TimeStamp.hpp"
 
 #define RECV_BUFF_SIZE 10240
-#define CELLSERVER_THREAD_NUM 4
 
 class ClientSocket;
 class CellServer;
 class EasyTcpServer;
 
+// client class
 class ClientSocket
 {
 public:
@@ -45,7 +45,6 @@ public:
 	}
 	~ClientSocket()
 	{
-
 	}
 
 	SOCKET Sockfd() { return _sockfd; }
@@ -53,16 +52,27 @@ public:
 	int GetLastPos() { return _lastPos; }
 	void SetLastPos(int pos) { _lastPos = pos; }
 
+	int SendData(DataHeader* header)
+	{
+		if (header) {
+			return send(_sockfd, (const char*)header, header->dataLen, 0);
+		}
+		return SOCKET_ERROR;
+	}
+
 private:
 	SOCKET _sockfd; // fd_set file desc set
-	char _msgBuf[RECV_BUFF_SIZE * 10] = {}; // the 2nd buffer
+	char _msgBuf[RECV_BUFF_SIZE * 5] = {}; // the 2nd buffer
 	int _lastPos = 0;
 };
 
+// net event interface
 class INetEvent
 {
 public:
-	virtual void OnLeave(ClientSocket* client) = 0;
+	virtual void OnNetLeave(ClientSocket* client) = 0;
+	virtual void OnNetMsg(ClientSocket* client, DataHeader* header) = 0;
+	virtual void OnNetJoin(ClientSocket* client) = 0;
 };
 
 
@@ -72,8 +82,6 @@ public:
 	CellServer(SOCKET sock = INVALID_SOCKET)
 	{
 		_sock = sock;
-		_thread = nullptr;
-		_recvCnt = 0;
 		_netEvent = nullptr;
 	}
 	~CellServer()
@@ -150,7 +158,7 @@ public:
 						if (iter != _clients.end()) {
 							// leave event
 							if(_netEvent)
-								_netEvent->OnLeave(_clients[i]);
+								_netEvent->OnNetLeave(_clients[i]);
 
 							delete _clients[i];
 							_clients.erase(iter);
@@ -174,7 +182,7 @@ public:
 		// recvbuf	
 		int len = recv(client->Sockfd(), _recvBuf, RECV_BUFF_SIZE, 0);
 		if (len <= 0) {
-			printf("client<%d> quit..\n", (int)client->Sockfd());
+			//printf("client<%d> quit..\n", (int)client->Sockfd());
 			return -1;
 		}
 		// copy to 2nd buffer
@@ -186,7 +194,7 @@ public:
 			DataHeader* header = (DataHeader*)client->MsgBuf();
 			if (client->GetLastPos() >= header->dataLen) {
 				int size = client->GetLastPos() - header->dataLen;
-				this->OnNetMsg(client->Sockfd(), header);
+				this->OnNetMsg(client, header);
 				memcpy(client->MsgBuf(), client->MsgBuf() + header->dataLen, size);
 				client->SetLastPos(size);
 			}
@@ -198,9 +206,9 @@ public:
 		return 0;
 	}
 
-	virtual void OnNetMsg(SOCKET cSock, DataHeader* header)
+	void OnNetMsg(ClientSocket* client, DataHeader* header)
 	{
-		_recvCnt++;
+		_netEvent->OnNetMsg(client, header);
 		//auto t1 = _time.GetElapsedTimeInSec();
 		//if (t1 >= 1.0) {
 		//	printf("time<%lf>,client nums<%d> recvCnt<%d>\n", t1, _clients.size(), _recvCnt);
@@ -212,17 +220,17 @@ public:
 		{
 		case CMD_LOGIN:
 		{
-			Login* login = (Login*)header;
+			//Login* login = (Login*)header;
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 			// send msg
-			//LoginResult ret;
-			//ret.result = 1;
-			//this->SendData(cSock, &ret);
+			LoginResult ret;
+			ret.result = 1;
+			client->SendData(&ret);
 		}
 		break;
 		case CMD_LOGOUT:
 		{
-			Logout* logout = (Logout*)header;
+			//Logout* logout = (Logout*)header;
 			//printf("client<%d> Logout: userName = %s\n", (int)cSock, logout->userName);
 			// send msg
 			//LogoutResult ret;
@@ -246,7 +254,7 @@ public:
 
 	void Start()
 	{
-		_thread = new std::thread(&CellServer::OnRun, this);
+		_thread = std::thread(&CellServer::OnRun, this);
 	}
 
 	size_t GetClientCount()
@@ -265,10 +273,9 @@ private:
 	// clients buffer queue
 	std::vector<ClientSocket*> _clientsBuffer; 
 	std::mutex _mutex;
-	std::thread* _thread;
+	std::thread _thread;
 	INetEvent* _netEvent;
-public:
-	std::atomic<int> _recvCnt;
+
 };
 
 
@@ -278,6 +285,8 @@ public:
 	EasyTcpServer()
 	{
 		_sock = INVALID_SOCKET;
+		_recvCnt = 0;
+		_clientCnt = 0;
 	}
 	~EasyTcpServer()
 	{
@@ -310,21 +319,12 @@ public:
 		if (INVALID_SOCKET != _sock) {
 			// close
 #ifdef _WIN32
-			for (int i = 0; i < _clients.size(); i++) {
-				closesocket(_clients[i]->Sockfd());
-				delete _clients[i];
-			}
 			closesocket(_sock);
 			WSACleanup();
 #else
-			for (int i = 0; i < g_Clients.size(); i++) {
-				close(_clients[i]->Sockfd());
-				delete _clients[i];
-			}
 			close(_sock);
 #endif // _WIN32
 			_sock = INVALID_SOCKET;
-			_clients.clear();
 		}
 	}
 
@@ -389,6 +389,7 @@ public:
 		else {
 			//printf("new client connect: socket = %d, IP = %s, nums = %d\n", (int)cSock, inet_ntoa(clientAddr.sin_addr), _clients.size());
 
+			// add new client to cellServers
 			this->AddClientToCellServer(new ClientSocket(cSock));
 			
 		}
@@ -397,7 +398,6 @@ public:
 
 	void AddClientToCellServer(ClientSocket* client)
 	{
-		_clients.push_back(client);
 		// look for the min num in cellServers
 		auto min = _cellServers[0];
 		for (auto cellServer : _cellServers){
@@ -406,14 +406,17 @@ public:
 			}
 		}
 		min->AddClient(client);
+		OnNetJoin(client);
 	}
 
-	void Start()
+	void Start(int cellServer)
 	{
-		for (int i = 0; i < CELLSERVER_THREAD_NUM; i++) {
+		for (int i = 0; i < cellServer; i++) {
 			auto ser = new CellServer(_sock);
 			_cellServers.push_back(ser);
+			// regist net event
 			ser->SetEventObj(this);
+			// start client msg process thread
 			ser->Start();
 		}
 	}
@@ -435,7 +438,7 @@ public:
 			/// <returns></returns>
 			int ret = select(_sock + 1, &fdRead, nullptr, nullptr, &t);
 			if (ret < 0) {
-				printf("select quit..\n");
+				printf("accpet select quit..\n");
 				Close();
 				return false;
 			}
@@ -459,55 +462,37 @@ public:
 		return INVALID_SOCKET != _sock;
 	}
 
-
-
-	int SendData(SOCKET cSock, DataHeader* header)
-	{
-		if (IsRun() && header) {
-			return send(cSock, (const char*)header, header->dataLen, 0);
-		}
-		return SOCKET_ERROR;
-	}
-
-	void SendDataToAll(DataHeader* header)
-	{
-		if (IsRun() && header) {
-			for (int i = 0; i < _clients.size(); i++) {	
-				SendData(_clients[i]->Sockfd(), header);
-			}
-		}
-	}
-
-	virtual void TimeForMsg()
+	void TimeForMsg()
 	{
 		auto t1 = _time.GetElapsedTimeInSec();
 		if( t1 >= 1.0){
-			int recvCnt = 0;
-			for (auto ser : _cellServers) {
-				recvCnt += ser->_recvCnt;
-				ser->_recvCnt = 0;
-			}
-
-			printf("thread<%d>, time<%lf>,client nums<%d> recvCnt<%d>\n",_cellServers.size(), t1, _clients.size(), (int)(recvCnt / t1));
+			printf("thread<%d>, time<%lf>,client nums<%d> recvCnt<%d>\n",_cellServers.size(), t1, (int)_clientCnt, (int)(_recvCnt / t1));
+			_recvCnt = 0;
 			_time.Update();
 		}
 	}
 
-	virtual void OnLeave(ClientSocket* client)
+	virtual void OnNetLeave(ClientSocket* client)
 	{
-		for (int i = 0; i < _clients.size(); i++) {
-			if (_clients[i] == client) {
-				auto iter = _clients.begin() + i;
-				if (iter != _clients.end()) {
-					_clients.erase(iter);
-				}
-			}
-		}
+		_clientCnt--;
+	}
+
+	virtual void OnNetMsg(ClientSocket* client, DataHeader* header)
+	{
+		_recvCnt++;
+	}
+
+	virtual void OnNetJoin(ClientSocket* client)
+	{
+		_clientCnt++;
 	}
 
 private:
 	SOCKET _sock;
-	std::vector<ClientSocket*> _clients;
 	std::vector<CellServer*> _cellServers;
 	TimeStamp _time;
+
+protected:
+	std::atomic<int> _recvCnt;
+	std::atomic<int> _clientCnt;
 };

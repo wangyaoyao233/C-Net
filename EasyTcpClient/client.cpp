@@ -24,7 +24,7 @@ EasyTcpClient* client[cCount];
 
 void ThreadSend(int id)
 {
-	// id: 1~4
+	// id: 1~5
 	int begin = (id - 1) * (cCount / tCount);
 	int end = id * (cCount / tCount);
 
@@ -35,8 +35,11 @@ void ThreadSend(int id)
 	for (int i = begin; i < end; i++) {
 		client[i]->Init();
 		client[i]->Connect("127.0.0.1", 4567);
-		printf("thread id=%d, connect=%d\n", id, i);
 	}
+	printf("thread id=%d, connect<begin=%d, end=%d>\n", id, begin, end);
+
+	std::chrono::microseconds t(3000);
+	std::this_thread::sleep_for(t);
 
 	Login login[mCount];
 	for (int i = 0; i < mCount; i++) {
@@ -48,7 +51,7 @@ void ThreadSend(int id)
 	{
 		for (int i = begin; i < end; i++) {
 			client[i]->SendData(login, len);
-			//client[i]->OnRun();
+			client[i]->OnRun();
 		}
 	}
 
