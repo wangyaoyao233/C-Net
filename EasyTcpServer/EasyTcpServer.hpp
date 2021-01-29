@@ -21,6 +21,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include <thread> // std::thread
 #include <mutex> // std::mutex
 #include <atomic> // std::atomic
@@ -94,14 +95,14 @@ public:
 		if (INVALID_SOCKET != _sock) {
 			// close
 #ifdef _WIN32
-			for (int i = 0; i < _clients.size(); i++) {
-				closesocket(_clients[i]->Sockfd());
-				delete _clients[i];
+			for (auto iter : _clients) {
+				closesocket(iter.first);
+				delete iter.second;
 			}
 #else
-			for (int i = 0; i < g_Clients.size(); i++) {
-				close(_clients[i]->Sockfd());
-				delete _clients[i];
+			for (auto iter : _clients) {
+				close(iter.first);
+				delete iter.second;
 			}
 #endif // _WIN32
 			_clients.clear();
@@ -112,14 +113,19 @@ public:
 
 	bool OnRun()
 	{
+		fd_set fdRead_back{};
+		bool clientChange = false;
+		int maxSock = 0;
+
 		while (IsRun()) {
 			// get client from clients buffer queue
 			if (!_clientsBuffer.empty()) {
 				std::lock_guard<std::mutex> lock(_mutex);
 				for (auto client : _clientsBuffer) {
-					_clients.push_back(client);
+					_clients[client->Sockfd()] = client;
 				}
 				_clientsBuffer.clear();
+				clientChange = true;
 			}
 			// if no client
 			if (_clients.empty()) {
@@ -132,14 +138,24 @@ public:
 			fd_set fdRead{};
 			FD_ZERO(&fdRead);
 
-			int maxSock = _clients[0]->Sockfd();;
-			for (int i = 0; i < _clients.size(); i++) {
-				FD_SET(_clients[i]->Sockfd(), &fdRead);
-				if (_clients[i]->Sockfd() > maxSock) {
-					maxSock = _clients[i]->Sockfd();
+			if (clientChange) {
+				clientChange = false;
+				// add socket to fd_set
+				maxSock = _clients.begin()->first;
+				for (auto iter : _clients) {
+					FD_SET(iter.first, &fdRead);
+					if (iter.first > maxSock) {
+						maxSock = iter.first;
+					}
 				}
+				// back up
+				memcpy(&fdRead_back, &fdRead, sizeof(fd_set));
+			}
+			else {
+				memcpy(&fdRead, &fdRead_back, sizeof(fd_set));
 			}
 
+			timeval t{ 0,0 };
 			/// <summary>
 			/// nfds 是一个整数值, 是指fd_set集合中所有描述符(socket)的范围, 而不是数量, 即是所有文件描述符的最大值+1
 			/// </summary>
@@ -150,22 +166,48 @@ public:
 				Close();
 				return false;
 			}
+			else if (ret == 0) {
+				continue;
+			}
 
-			for (int i = 0; i < _clients.size(); i++) {
-				if (FD_ISSET(_clients[i]->Sockfd(), &fdRead)) {
-					if (-1 == this->RecvData(_clients[i])) {
-						auto iter = _clients.begin() + i;
-						if (iter != _clients.end()) {
-							// leave event
-							if(_netEvent)
-								_netEvent->OnNetLeave(_clients[i]);
+#ifdef _WIN32
+			for (int i = 0; i < fdRead.fd_count; i++) {
+				auto iter = _clients.find(fdRead.fd_array[i]);
+				if (iter != _clients.end()) {
+					if (-1 == this->RecvData(iter->second)) {
+						// leave event
+						if (_netEvent)
+							_netEvent->OnNetLeave(iter->second);
 
-							delete _clients[i];
-							_clients.erase(iter);
-						}
+						clientChange = true;
+						_clients.erase(iter->first);
+					}
+				}
+				else {
+					printf("error..iter == _clients.end()\n");
+				}
+			}
+#else
+			std::vector<ClientSocket*> temp;
+			for (auto iter : _clients)
+			{
+				if (FD_ISSET(iter.first, &fdRead)) {
+					if (-1 == this->RecvData(iter.second)) {
+						// leave event
+						if (_netEvent)
+							_netEvent->OnNetLeave(iter.second);
+
+						_clientChange = true;
+						temp.push_back(iter.second);
 					}
 				}
 			}
+			for (auto client : temp) {
+				_clients.erase(client->Sockfd());
+				delete client;
+			}
+#endif // _WIN32
+
 
 		}
 
@@ -222,10 +264,11 @@ public:
 		{
 			//Login* login = (Login*)header;
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
+
 			// send msg
-			LoginResult ret;
-			ret.result = 1;
-			client->SendData(&ret);
+			//LoginResult ret;
+			//ret.result = 1;
+			//client->SendData(&ret);
 		}
 		break;
 		case CMD_LOGOUT:
@@ -269,7 +312,7 @@ public:
 
 private:
 	SOCKET _sock;
-	std::vector<ClientSocket*> _clients;
+	std::map<SOCKET, ClientSocket*>_clients;
 	// clients buffer queue
 	std::vector<ClientSocket*> _clientsBuffer; 
 	std::mutex _mutex;
