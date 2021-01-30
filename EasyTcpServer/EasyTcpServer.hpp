@@ -27,13 +27,18 @@
 #include <atomic> // std::atomic
 #include "Message.hpp"
 #include "TimeStamp.hpp"
+#include "CellTask.hpp"
 
 #define RECV_BUFF_SIZE 10240
 #define SEND_BUFF_SIZE (10240 * 5)
 
+
 class ClientSocket;
+class INetEvent;
+class SendMsgTask;
 class CellServer;
 class EasyTcpServer;
+
 
 // client class
 class ClientSocket
@@ -94,14 +99,35 @@ private:
 	int _lastSendPos = 0;
 };
 
+
 // net event interface
 class INetEvent
 {
 public:
 	virtual void OnNetLeave(ClientSocket* client) = 0;
-	virtual void OnNetMsg(ClientSocket* client, DataHeader* header) = 0;
+	virtual void OnNetMsg(CellServer* cellServer, ClientSocket* client, DataHeader* header) = 0;
 	virtual void OnNetJoin(ClientSocket* client) = 0;
 	virtual void OnNetRecv(ClientSocket* client) = 0;
+};
+
+
+class SendMsgTask :public ITask
+{
+public:
+	SendMsgTask(ClientSocket* client, DataHeader* header)
+	{
+		_client = client;
+		_header = header;
+	}
+	void DoTask() override
+	{
+		_client->SendData(_header);
+		delete _header;
+	}
+
+private:
+	ClientSocket* _client;
+	DataHeader* _header;
 };
 
 
@@ -145,7 +171,8 @@ public:
 		bool clientChange = false;
 		int maxSock = 0;
 
-		while (IsRun()) {
+		while (IsRun()) 
+		{
 			// get client from clients buffer queue
 			if (!_clientsBuffer.empty()) {
 				std::lock_guard<std::mutex> lock(_mutex);
@@ -280,37 +307,8 @@ public:
 
 	void OnNetMsg(ClientSocket* client, DataHeader* header)
 	{
-		_netEvent->OnNetMsg(client, header);
+		_netEvent->OnNetMsg(this, client, header);
 
-		switch (header->cmd)
-		{
-		case CMD_LOGIN:
-		{
-			//Login* login = (Login*)header;
-			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
-
-			// send msg
-			LoginResult ret;
-			ret.result = 1;
-			client->SendData(&ret);
-		}
-		break;
-		case CMD_LOGOUT:
-		{
-			//Logout* logout = (Logout*)header;
-			//printf("client<%d> Logout: userName = %s\n", (int)cSock, logout->userName);
-			// send msg
-			//LogoutResult ret;
-			//ret.result = 1;
-			//this->SendData(cSock, &ret);
-		}
-		break;
-		default:
-		{
-
-		}
-		break;
-		}
 	}
 
 	void AddClient(ClientSocket* client)
@@ -322,6 +320,7 @@ public:
 	void Start()
 	{
 		_thread = std::thread(&CellServer::OnRun, this);
+		_taskServer.Start();
 	}
 
 	size_t GetClientCount()
@@ -334,6 +333,12 @@ public:
 		_netEvent = e;
 	}
 
+	void AddSendTask(ClientSocket* client, DataHeader* header)
+	{
+		SendMsgTask* task = new SendMsgTask(client, header);
+		_taskServer.AddTask(task);
+	}
+
 private:
 	SOCKET _sock;
 	std::map<SOCKET, ClientSocket*>_clients;
@@ -342,7 +347,7 @@ private:
 	std::mutex _mutex;
 	std::thread _thread;
 	INetEvent* _netEvent;
-
+	CellTaskServer _taskServer;
 };
 
 
@@ -546,7 +551,7 @@ public:
 		_clientCnt--;
 	}
 
-	virtual void OnNetMsg(ClientSocket* client, DataHeader* header)
+	virtual void OnNetMsg(CellServer* cellServer, ClientSocket* client, DataHeader* header)
 	{
 		_msgCnt++;
 	}

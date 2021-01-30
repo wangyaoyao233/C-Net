@@ -25,5 +25,8 @@
     <ClInclude Include="TimeStamp.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CellTask.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
