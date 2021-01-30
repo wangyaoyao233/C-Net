@@ -1,5 +1,6 @@
 #include "EasyTcpClient.hpp"
 #include <thread> // std::thread
+#include <atomic> // std::atomic
 
 using namespace std;
 bool g_Run = true;
@@ -19,8 +20,10 @@ void ThreadCmd()
 
 const int cCount = 1000;// FD_SETSIZE - 1;
 const int tCount = 4;
-const int mCount = 10;
+const int mCount = 1;
 EasyTcpClient* client[cCount];
+std::atomic<int> sendCnt = 0;
+std::atomic<int> readyCnt = 0;
 
 void ThreadSend(int id)
 {
@@ -38,8 +41,13 @@ void ThreadSend(int id)
 	}
 	printf("thread id=%d, connect<begin=%d, end=%d>\n", id, begin, end);
 
-	std::chrono::microseconds t(3000);
-	std::this_thread::sleep_for(t);
+	// all thread ready, begin to send
+	readyCnt++;
+	while (readyCnt < tCount)
+	{
+		std::chrono::microseconds t(10);
+		std::this_thread::sleep_for(t);
+	}
 
 	Login login[mCount];
 	for (int i = 0; i < mCount; i++) {
@@ -50,8 +58,10 @@ void ThreadSend(int id)
 	while (g_Run)
 	{
 		for (int i = begin; i < end; i++) {
-			client[i]->SendData(login, len);
-			//client[i]->OnRun();
+			if (SOCKET_ERROR != client[i]->SendData(login, len)) {
+				sendCnt++;
+			}
+			client[i]->OnRun();
 		}
 	}
 
@@ -73,6 +83,16 @@ int main()
 		ts[i] = thread(ThreadSend, i + 1);
 	}
 
+	TimeStamp time;
+	while (g_Run){
+		auto t1 = time.GetElapsedTimeInSec();
+		if (t1 >= 1.0) {
+			printf("thread<%d>, clients<%d>, time<%lf>, send<%d>\n", tCount, cCount, t1, (int)(sendCnt / t1));
+			sendCnt = 0;
+			time.Update();
+		}
+		Sleep(1);
+	}
 	
 	tc.join();
 	for (int i = 0; i < tCount; i++) {

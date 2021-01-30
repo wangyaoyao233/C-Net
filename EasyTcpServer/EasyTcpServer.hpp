@@ -29,6 +29,7 @@
 #include "TimeStamp.hpp"
 
 #define RECV_BUFF_SIZE 10240
+#define SEND_BUFF_SIZE (10240 * 5)
 
 class ClientSocket;
 class CellServer;
@@ -43,6 +44,8 @@ public:
 		_sockfd = sockfd;
 		memset(_msgBuf, 0, sizeof(_msgBuf));
 		_lastPos = 0;
+		memset(_sendBuf, 0, sizeof(_sendBuf));
+		_lastSendPos = 0;
 	}
 	~ClientSocket()
 	{
@@ -55,16 +58,40 @@ public:
 
 	int SendData(DataHeader* header)
 	{
-		if (header) {
-			return send(_sockfd, (const char*)header, header->dataLen, 0);
+		int ret = SOCKET_ERROR;
+		int len = header->dataLen;
+		const char* sendData = (const char*)header;
+
+		while (true)
+		{
+			// 定量
+			if (_lastSendPos + len >= SEND_BUFF_SIZE) {
+				int copyLen = SEND_BUFF_SIZE - _lastSendPos;
+				memcpy(_sendBuf + _lastSendPos, sendData, copyLen);
+				sendData += copyLen;
+				len -= copyLen;
+				ret = send(_sockfd, _sendBuf, SEND_BUFF_SIZE, 0);
+				_lastSendPos = 0;
+
+				if (SOCKET_ERROR == ret)
+					break;
+			}
+			else {
+				memcpy(_sendBuf + _lastSendPos, sendData, len);
+				_lastSendPos += len;
+				break;
+			}
 		}
-		return SOCKET_ERROR;
+
+		return ret;
 	}
 
 private:
 	SOCKET _sockfd; // fd_set file desc set
 	char _msgBuf[RECV_BUFF_SIZE * 5] = {}; // the 2nd buffer
 	int _lastPos = 0;
+	char _sendBuf[SEND_BUFF_SIZE] = {};
+	int _lastSendPos = 0;
 };
 
 // net event interface
@@ -74,6 +101,7 @@ public:
 	virtual void OnNetLeave(ClientSocket* client) = 0;
 	virtual void OnNetMsg(ClientSocket* client, DataHeader* header) = 0;
 	virtual void OnNetJoin(ClientSocket* client) = 0;
+	virtual void OnNetRecv(ClientSocket* client) = 0;
 };
 
 
@@ -227,6 +255,8 @@ public:
 			//printf("client<%d> quit..\n", (int)client->Sockfd());
 			return -1;
 		}
+		_netEvent->OnNetRecv(client);
+
 		// copy to 2nd buffer
 		memcpy(client->MsgBuf() + client->GetLastPos(), _recvBuf, len);
 		client->SetLastPos(client->GetLastPos() + len);
@@ -251,12 +281,6 @@ public:
 	void OnNetMsg(ClientSocket* client, DataHeader* header)
 	{
 		_netEvent->OnNetMsg(client, header);
-		//auto t1 = _time.GetElapsedTimeInSec();
-		//if (t1 >= 1.0) {
-		//	printf("time<%lf>,client nums<%d> recvCnt<%d>\n", t1, _clients.size(), _recvCnt);
-		//	_time.Update();
-		//	_recvCnt = 0;
-		//}
 
 		switch (header->cmd)
 		{
@@ -266,9 +290,9 @@ public:
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 
 			// send msg
-			//LoginResult ret;
-			//ret.result = 1;
-			//client->SendData(&ret);
+			LoginResult ret;
+			ret.result = 1;
+			client->SendData(&ret);
 		}
 		break;
 		case CMD_LOGOUT:
@@ -328,6 +352,7 @@ public:
 	EasyTcpServer()
 	{
 		_sock = INVALID_SOCKET;
+		_msgCnt = 0;
 		_recvCnt = 0;
 		_clientCnt = 0;
 	}
@@ -509,7 +534,8 @@ public:
 	{
 		auto t1 = _time.GetElapsedTimeInSec();
 		if( t1 >= 1.0){
-			printf("thread<%d>, time<%lf>,client nums<%d> recvCnt<%d>\n",_cellServers.size(), t1, (int)_clientCnt, (int)(_recvCnt / t1));
+			printf("thread<%d>, time<%lf>,client nums<%d> recv<%d>,msg<%d>\n", _cellServers.size(), t1, (int)_clientCnt, (int)(_recvCnt / t1), (int)(_msgCnt / t1));
+			_msgCnt = 0;
 			_recvCnt = 0;
 			_time.Update();
 		}
@@ -522,12 +548,17 @@ public:
 
 	virtual void OnNetMsg(ClientSocket* client, DataHeader* header)
 	{
-		_recvCnt++;
+		_msgCnt++;
 	}
 
 	virtual void OnNetJoin(ClientSocket* client)
 	{
 		_clientCnt++;
+	}
+
+	virtual void OnNetRecv(ClientSocket* client)
+	{
+		_recvCnt++;
 	}
 
 private:
@@ -536,6 +567,7 @@ private:
 	TimeStamp _time;
 
 protected:
+	std::atomic<int> _msgCnt;
 	std::atomic<int> _recvCnt;
 	std::atomic<int> _clientCnt;
 };
