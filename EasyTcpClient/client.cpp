@@ -18,7 +18,7 @@ void ThreadCmd()
 	}
 }
 
-const int cCount = 10000;// FD_SETSIZE - 1;
+const int cCount = 1000;// FD_SETSIZE - 1;
 const int tCount = 4;
 const int mCount = 1;
 EasyTcpClient* client[cCount];

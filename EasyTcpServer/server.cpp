@@ -1,3 +1,4 @@
+#include "Alloc.h"
 #include "EasyTcpServer.hpp"
 #include <thread>
 

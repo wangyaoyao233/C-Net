@@ -139,11 +139,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Alloc.cpp" />
     <ClCompile Include="server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Alloc.h" />
     <ClInclude Include="CellTask.hpp" />
     <ClInclude Include="EasyTcpServer.hpp" />
+    <ClInclude Include="MemoryMgr.hpp" />
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="TimeStamp.hpp" />
   </ItemGroup>
