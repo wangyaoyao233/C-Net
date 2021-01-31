@@ -22,7 +22,10 @@
 #include "Message.hpp"
 #include "TimeStamp.hpp"
 
+#ifndef RECV_BUFF_SIZE
 #define RECV_BUFF_SIZE 10240
+#endif // !RECV_BUFF_SIZE
+
 
 class EasyTcpClient
 {

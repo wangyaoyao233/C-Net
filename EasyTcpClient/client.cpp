@@ -18,12 +18,27 @@ void ThreadCmd()
 	}
 }
 
+
+
+
 const int cCount = 1000;// FD_SETSIZE - 1;
 const int tCount = 4;
 const int mCount = 10;
 EasyTcpClient* client[cCount];
 std::atomic<int> sendCnt = 0;
 std::atomic<int> readyCnt = 0;
+
+void ThreadRecv(int begin, int end)
+{
+	while (g_Run)
+	{
+		for (int i = begin; i < end; i++) {
+			client[i]->OnRun();
+		}
+	}
+}
+
+
 
 void ThreadSend(int id)
 {
@@ -49,6 +64,10 @@ void ThreadSend(int id)
 		std::this_thread::sleep_for(t);
 	}
 
+	// start recv thread
+	std::thread tr(ThreadRecv, begin, end);
+	tr.detach();
+
 	Login login[mCount];
 	for (int i = 0; i < mCount; i++) {
 		strcpy(login[i].userName, "client");
@@ -61,8 +80,9 @@ void ThreadSend(int id)
 			if (SOCKET_ERROR != client[i]->SendData(login, len)) {
 				sendCnt++;
 			}
-			client[i]->OnRun();
 		}
+		//std::chrono::microseconds t(10);
+		//std::this_thread::sleep_for(t);
 	}
 
 	for (int i = begin; i < end; i++) {
