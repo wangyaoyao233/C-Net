@@ -2,25 +2,18 @@
 #include <thread> // std::thread
 #include <mutex> // std::mutex
 #include <list>
+#include <functional>
 #include "TimeStamp.hpp"
 
-// base task class
-class ITask
-{
-public:
-	ITask() {}
-	virtual ~ITask() {}
-
-	virtual void DoTask() = 0;
-};
 
 class CellTaskServer
 {
+	typedef std::function<void()> CellTask;
 public:
 	CellTaskServer() {}
 	~CellTaskServer() {}
 
-	void AddTask(std::shared_ptr<ITask> task)
+	void AddTask(CellTask task)
 	{
 		std::lock_guard<std::mutex> lock(_mutex);
 		_tasksBuf.push_back(task);
@@ -50,7 +43,7 @@ private:
 				continue;
 			}
 			for (auto task : _tasks) {
-				task->DoTask();
+				task();
 			}
 			_tasks.clear();
 		}
@@ -58,7 +51,7 @@ private:
 	}
 
 private:
-	std::list<std::shared_ptr<ITask>> _tasks;
-	std::list<std::shared_ptr<ITask>> _tasksBuf;
+	std::list<CellTask> _tasks;
+	std::list<CellTask> _tasksBuf;
 	std::mutex _mutex;
 };

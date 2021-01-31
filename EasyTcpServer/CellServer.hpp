@@ -11,27 +11,6 @@
 
 
 
-class SendMsgTask :public ITask
-{
-public:
-	SendMsgTask(std::shared_ptr<CellClient> client, std::shared_ptr<Netmsg_DataHeader> header)
-	{
-		_client = client;
-		_header = header;
-	}
-	void DoTask() override
-	{
-		_client->SendData(_header);
-	}
-
-private:
-	std::shared_ptr<CellClient> _client;
-	std::shared_ptr<Netmsg_DataHeader> _header;
-};
-
-
-
-
 class CellServer
 {
 public:
@@ -233,9 +212,9 @@ public:
 
 	void AddSendTask(std::shared_ptr<CellClient> client, std::shared_ptr<Netmsg_DataHeader> header)
 	{
-		auto task = std::make_shared<SendMsgTask>(client, header);
-
-		_taskServer.AddTask(task);
+		_taskServer.AddTask([client, header]() {
+			client->SendData(header);
+			});
 	}
 
 private:
