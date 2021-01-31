@@ -148,6 +148,7 @@
     <ClInclude Include="EasyTcpServer.hpp" />
     <ClInclude Include="MemoryMgr.hpp" />
     <ClInclude Include="Message.hpp" />
+    <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="TimeStamp.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

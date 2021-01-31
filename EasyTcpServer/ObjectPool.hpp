@@ -4,14 +4,14 @@
 #include <assert.h> // assert
 
 #ifdef _DEBUG
-#ifndef xPrintf
-#include <stdio.h>
-#define xPrintf(...) printf(__VA_ARGS__)
-#endif // !xPrintf
+	#ifndef xPrintf
+		#include <stdio.h>
+		#define xPrintf(...) printf(__VA_ARGS__)
+	#endif // !xPrintf
 #else
-#ifndef xPrintf
-#define xPrintf(...)
-#endif // !xPrintf
+	#ifndef xPrintf
+		#define xPrintf(...)
+	#endif // !xPrintf
 #endif // _DEBUG
 
 template<class T, size_t PoolSize>

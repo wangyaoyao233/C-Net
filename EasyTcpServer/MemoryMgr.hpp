@@ -68,7 +68,7 @@ public:
 			ret->MeAlloc = nullptr;
 			ret->Next = nullptr;
 
-			printf("AllocMem: %p, id=%d, size=%d\n", ret, ret->Id, size);
+			//printf("AllocMem: %p, id=%d, size=%d\n", ret, ret->Id, size);
 		}
 		else {
 			ret = _header;
@@ -108,7 +108,7 @@ public:
 
 	void Init()
 	{
-		xPrintf("MemoryAlloc<%d>, block num<%d> init..\n", _size, _blockNum);
+		//xPrintf("MemoryAlloc<%d>, block num<%d> init..\n", _size, _blockNum);
 
 		assert(nullptr == _buf);
 		if (_buf)	return;
@@ -227,7 +227,7 @@ private:
 		//InitSize(257, 512, &_mem512);
 		//InitSize(513, 1024, &_mem1024);
 
-		xPrintf("MemoryMgr..\n");
+		//xPrintf("MemoryMgr..\n");
 	}
 	~MemoryMgr() {}
 

@@ -29,6 +29,7 @@
 #include "Message.hpp"
 #include "TimeStamp.hpp"
 #include "CellTask.hpp"
+#include "ObjectPool.hpp"
 
 #define RECV_BUFF_SIZE 10240
 #define SEND_BUFF_SIZE (10240 * 5)
@@ -42,7 +43,7 @@ class EasyTcpServer;
 
 
 // client class
-class ClientSocket
+class ClientSocket: public IObjectPool<ClientSocket, 1000>
 {
 public:
 	ClientSocket(SOCKET sockfd = INVALID_SOCKET)
@@ -461,7 +462,7 @@ public:
 			//printf("new client connect: socket = %d, IP = %s, nums = %d\n", (int)cSock, inet_ntoa(clientAddr.sin_addr), _clients.size());
 
 			// add new client to cellServers
-			this->AddClientToCellServer(std::make_shared<ClientSocket>(cSock));
+			this->AddClientToCellServer(std::shared_ptr<ClientSocket>(new ClientSocket(cSock)));
 			
 		}
 		return cSock;
