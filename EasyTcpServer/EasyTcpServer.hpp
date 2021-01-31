@@ -25,6 +25,7 @@
 #include <thread> // std::thread
 #include <mutex> // std::mutex
 #include <atomic> // std::atomic
+#include <memory> // std::shared_ptr
 #include "Message.hpp"
 #include "TimeStamp.hpp"
 #include "CellTask.hpp"
@@ -61,11 +62,11 @@ public:
 	int GetLastPos() { return _lastPos; }
 	void SetLastPos(int pos) { _lastPos = pos; }
 
-	int SendData(DataHeader* header)
+	int SendData(std::shared_ptr<DataHeader> header)
 	{
 		int ret = SOCKET_ERROR;
 		int len = header->dataLen;
-		const char* sendData = (const char*)header;
+		const char* sendData = (const char*)header.get();
 
 		while (true)
 		{
@@ -104,17 +105,17 @@ private:
 class INetEvent
 {
 public:
-	virtual void OnNetLeave(ClientSocket* client) = 0;
-	virtual void OnNetMsg(CellServer* cellServer, ClientSocket* client, DataHeader* header) = 0;
-	virtual void OnNetJoin(ClientSocket* client) = 0;
-	virtual void OnNetRecv(ClientSocket* client) = 0;
+	virtual void OnNetLeave(std::shared_ptr<ClientSocket> client) = 0;
+	virtual void OnNetMsg(CellServer* cellServer, std::shared_ptr<ClientSocket> client, DataHeader* header) = 0;
+	virtual void OnNetJoin(std::shared_ptr<ClientSocket> client) = 0;
+	virtual void OnNetRecv(std::shared_ptr<ClientSocket> client) = 0;
 };
 
 
 class SendMsgTask :public ITask
 {
 public:
-	SendMsgTask(ClientSocket* client, DataHeader* header)
+	SendMsgTask(std::shared_ptr<ClientSocket> client, std::shared_ptr<DataHeader> header)
 	{
 		_client = client;
 		_header = header;
@@ -122,12 +123,11 @@ public:
 	void DoTask() override
 	{
 		_client->SendData(_header);
-		delete _header;
 	}
 
 private:
-	ClientSocket* _client;
-	DataHeader* _header;
+	std::shared_ptr<ClientSocket> _client;
+	std::shared_ptr<DataHeader> _header;
 };
 
 
@@ -151,12 +151,10 @@ public:
 #ifdef _WIN32
 			for (auto iter : _clients) {
 				closesocket(iter.first);
-				delete iter.second;
 			}
 #else
 			for (auto iter : _clients) {
 				close(iter.first);
-				delete iter.second;
 			}
 #endif // _WIN32
 			_clients.clear();
@@ -243,7 +241,7 @@ public:
 				}
 			}
 #else
-			std::vector<ClientSocket*> temp;
+			std::vector<std::shared_ptr<ClientSocket>> temp;
 			for (auto iter : _clients)
 			{
 				if (FD_ISSET(iter.first, &fdRead)) {
@@ -259,7 +257,6 @@ public:
 			}
 			for (auto client : temp) {
 				_clients.erase(client->Sockfd());
-				delete client;
 			}
 #endif // _WIN32
 
@@ -274,7 +271,7 @@ public:
 	}
 
 	char _recvBuf[RECV_BUFF_SIZE] = {};
-	int RecvData(ClientSocket* client)
+	int RecvData(std::shared_ptr<ClientSocket> client)
 	{
 		// recvbuf	
 		int len = recv(client->Sockfd(), _recvBuf, RECV_BUFF_SIZE, 0);
@@ -305,13 +302,13 @@ public:
 		return 0;
 	}
 
-	void OnNetMsg(ClientSocket* client, DataHeader* header)
+	void OnNetMsg(std::shared_ptr<ClientSocket> client, DataHeader* header)
 	{
 		_netEvent->OnNetMsg(this, client, header);
 
 	}
 
-	void AddClient(ClientSocket* client)
+	void AddClient(std::shared_ptr<ClientSocket> client)
 	{
 		std::lock_guard<std::mutex> lock(_mutex);
 		_clientsBuffer.push_back(client);
@@ -333,17 +330,18 @@ public:
 		_netEvent = e;
 	}
 
-	void AddSendTask(ClientSocket* client, DataHeader* header)
+	void AddSendTask(std::shared_ptr<ClientSocket> client,std::shared_ptr<DataHeader> header)
 	{
-		SendMsgTask* task = new SendMsgTask(client, header);
+		auto task = std::make_shared<SendMsgTask>(client, header);
+
 		_taskServer.AddTask(task);
 	}
 
 private:
 	SOCKET _sock;
-	std::map<SOCKET, ClientSocket*>_clients;
+	std::map<SOCKET, std::shared_ptr<ClientSocket>>_clients;
 	// clients buffer queue
-	std::vector<ClientSocket*> _clientsBuffer; 
+	std::vector<std::shared_ptr<ClientSocket>> _clientsBuffer; 
 	std::mutex _mutex;
 	std::thread _thread;
 	INetEvent* _netEvent;
@@ -463,13 +461,13 @@ public:
 			//printf("new client connect: socket = %d, IP = %s, nums = %d\n", (int)cSock, inet_ntoa(clientAddr.sin_addr), _clients.size());
 
 			// add new client to cellServers
-			this->AddClientToCellServer(new ClientSocket(cSock));
+			this->AddClientToCellServer(std::make_shared<ClientSocket>(cSock));
 			
 		}
 		return cSock;
 	}
 
-	void AddClientToCellServer(ClientSocket* client)
+	void AddClientToCellServer(std::shared_ptr<ClientSocket> client)
 	{
 		// look for the min num in cellServers
 		auto min = _cellServers[0];
@@ -485,7 +483,7 @@ public:
 	void Start(int cellServer)
 	{
 		for (int i = 0; i < cellServer; i++) {
-			auto ser = new CellServer(_sock);
+			auto ser = std::make_shared<CellServer>(_sock);
 			_cellServers.push_back(ser);
 			// regist net event
 			ser->SetEventObj(this);
@@ -546,29 +544,29 @@ public:
 		}
 	}
 
-	virtual void OnNetLeave(ClientSocket* client)
+	virtual void OnNetLeave(std::shared_ptr<ClientSocket> client)
 	{
 		_clientCnt--;
 	}
 
-	virtual void OnNetMsg(CellServer* cellServer, ClientSocket* client, DataHeader* header)
+	virtual void OnNetMsg(CellServer* cellServer, std::shared_ptr<ClientSocket> client, DataHeader* header)
 	{
 		_msgCnt++;
 	}
 
-	virtual void OnNetJoin(ClientSocket* client)
+	virtual void OnNetJoin(std::shared_ptr<ClientSocket> client)
 	{
 		_clientCnt++;
 	}
 
-	virtual void OnNetRecv(ClientSocket* client)
+	virtual void OnNetRecv(std::shared_ptr<ClientSocket> client)
 	{
 		_recvCnt++;
 	}
 
 private:
 	SOCKET _sock;
-	std::vector<CellServer*> _cellServers;
+	std::vector<std::shared_ptr<CellServer>> _cellServers;
 	TimeStamp _time;
 
 protected:

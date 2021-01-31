@@ -21,12 +21,12 @@ void ThreadCmd()
 class MyServer :public EasyTcpServer
 {
 public:
-	void OnNetLeave(ClientSocket* client) override
+	void OnNetLeave(std::shared_ptr<ClientSocket> client) override
 	{
 		EasyTcpServer::OnNetLeave(client);
 	}
 
-	void OnNetMsg(CellServer* cellServer, ClientSocket* client, DataHeader* header) override
+	void OnNetMsg(CellServer* cellServer, std::shared_ptr<ClientSocket> client, DataHeader* header) override
 	{
 		EasyTcpServer::OnNetMsg(cellServer, client, header);
 		switch (header->cmd)
@@ -37,36 +37,29 @@ public:
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 
 			// send msg
-			LoginResult* ret = new LoginResult();
+			auto ret = std::make_shared<LoginResult>();
 			ret->result = 1;
 
-			cellServer->AddSendTask(client, ret);
+			cellServer->AddSendTask(client, std::shared_ptr<DataHeader>(ret));
 		}
 		break;
 		case CMD_LOGOUT:
 		{
-			//Logout* logout = (Logout*)header;
-			//printf("client<%d> Logout: userName = %s\n", (int)cSock, logout->userName);
-			// send msg
-			//LogoutResult ret;
-			//ret.result = 1;
-			//this->SendData(cSock, &ret);
 		}
 		break;
 		default:
 		{
-
 		}
 		break;
 		}
 	}
 
-	void OnNetJoin(ClientSocket* client) override
+	void OnNetJoin(std::shared_ptr<ClientSocket> client) override
 	{
 		EasyTcpServer::OnNetJoin(client);
 	}
 
-	void OnNetRecv(ClientSocket* client) override
+	void OnNetRecv(std::shared_ptr<ClientSocket> client) override
 	{
 		EasyTcpServer::OnNetRecv(client);
 	}

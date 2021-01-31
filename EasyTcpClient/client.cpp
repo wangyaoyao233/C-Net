@@ -20,7 +20,7 @@ void ThreadCmd()
 
 const int cCount = 1000;// FD_SETSIZE - 1;
 const int tCount = 4;
-const int mCount = 1;
+const int mCount = 10;
 EasyTcpClient* client[cCount];
 std::atomic<int> sendCnt = 0;
 std::atomic<int> readyCnt = 0;

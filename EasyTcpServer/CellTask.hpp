@@ -20,7 +20,7 @@ public:
 	CellTaskServer() {}
 	~CellTaskServer() {}
 
-	void AddTask(ITask* task)
+	void AddTask(std::shared_ptr<ITask> task)
 	{
 		std::lock_guard<std::mutex> lock(_mutex);
 		_tasksBuf.push_back(task);
@@ -51,7 +51,6 @@ private:
 			}
 			for (auto task : _tasks) {
 				task->DoTask();
-				delete task;
 			}
 			_tasks.clear();
 		}
@@ -59,7 +58,7 @@ private:
 	}
 
 private:
-	std::list<ITask*> _tasks;
-	std::list<ITask*> _tasksBuf;
+	std::list<std::shared_ptr<ITask>> _tasks;
+	std::list<std::shared_ptr<ITask>> _tasksBuf;
 	std::mutex _mutex;
 };
