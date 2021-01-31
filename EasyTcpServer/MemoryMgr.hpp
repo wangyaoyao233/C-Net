@@ -4,10 +4,14 @@
 #include <mutex>	// std::mutex
 
 #ifdef _DEBUG
-	#include <stdio.h>
-	#define xPrintf(...) printf(__VA_ARGS__)
+#ifndef xPrintf
+#include <stdio.h>
+#define xPrintf(...) printf(__VA_ARGS__)
+#endif // !xPrintf
 #else
-	#define xPrintf(...)
+#ifndef xPrintf
+#define xPrintf(...)
+#endif // !xPrintf
 #endif // _DEBUG
 
 
@@ -63,6 +67,8 @@ public:
 			ret->RefCnt = 1;
 			ret->MeAlloc = nullptr;
 			ret->Next = nullptr;
+
+			printf("AllocMem: %p, id=%d, size=%d\n", ret, ret->Id, size);
 		}
 		else {
 			ret = _header;
@@ -236,9 +242,9 @@ private:
 
 	MemoryAlloc* _sizeMeAlloc[MAX_MEMORY_SIZE + 1];
 private:
-	MemoryAlloctor<64, 1000000> _mem64;
+	MemoryAlloctor<64, 2000000> _mem64;
 	MemoryAlloctor<128, 1000000> _mem128;
 	//MemoryAlloctor<256, 100000> _mem256;
 	//MemoryAlloctor<512, 100000> _mem512;
-	MemoryAlloctor<1024, 100000> _mem1024;
+	//MemoryAlloctor<1024, 100000> _mem1024;
 };

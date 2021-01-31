@@ -1,5 +1,26 @@
 #include <stdlib.h>
 #include "Alloc.h"
+#include "ObjectPool.hpp"
+
+class A : public IObjectPool<A, 10>
+{
+public:
+	A(int n)
+	{
+		printf("A\n");
+		num = n;
+	}
+
+	~A()
+	{
+		printf("~A\n");
+	}
+private:
+	int num;
+};
+
+
+
 int main()
 {
 	/*
@@ -13,16 +34,19 @@ int main()
 	delete data3;
 	*/
 
-	char* data[1100];
-	for (int i = 0; i < 1100; i++)
-	{
-		data[i] = new char[1 + i];
+	//char* data[1100];
+	//for (int i = 0; i < 1100; i++)
+	//{
+	//	data[i] = new char[1 + i];
 
-	}
-	for (int i = 0; i < 1100; i++)
-	{
-		delete[] data[i];
-	}
+	//}
+	//for (int i = 0; i < 1100; i++)
+	//{
+	//	delete[] data[i];
+	//}
+
+	A* a = A::CreateObject(10);
+	A::DestoryObject(a);
 
 
 	return 0;
