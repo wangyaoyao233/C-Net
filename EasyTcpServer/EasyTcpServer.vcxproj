@@ -144,8 +144,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Alloc.h" />
+    <ClInclude Include="CellClient.hpp" />
+    <ClInclude Include="CellServer.hpp" />
     <ClInclude Include="CellTask.hpp" />
+    <ClInclude Include="Common.h" />
     <ClInclude Include="EasyTcpServer.hpp" />
+    <ClInclude Include="INetEvent.hpp" />
     <ClInclude Include="MemoryMgr.hpp" />
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
