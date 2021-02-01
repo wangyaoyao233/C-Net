@@ -2,7 +2,8 @@
 
 #include "Common.h"
 
-#define CLIENT_HEART_DEAD_TIME 5000
+#define CLIENT_HEART_DEAD_TIME 60000 // 60s
+#define CLIENT_SEND_BUFF_TIME 200
 
 // client class
 class CellClient : public IObjectPool<CellClient, 1000>
@@ -16,7 +17,7 @@ public:
 		memset(_sendBuf, 0, sizeof(_sendBuf));
 		_lastSendPos = 0;
 
-		this->RestLife();
+		this->RestDTHeart();
 	}
 	~CellClient()
 	{
@@ -26,6 +27,24 @@ public:
 	char* MsgBuf() { return _msgBuf; }
 	int GetLastPos() { return _lastPos; }
 	void SetLastPos(int pos) { _lastPos = pos; }
+
+	int SendDataImmediate(std::shared_ptr<Netmsg_DataHeader> header)
+	{
+		this->SendData(header);
+		this->SendDataImmediate();
+	}
+
+	// 立即将发送缓冲区数据发送给客户端
+	int SendDataImmediate()
+	{
+		int ret = SOCKET_ERROR;
+		if (_lastSendPos > 0 && SOCKET_ERROR != _sockfd) {
+			ret = send(_sockfd, _sendBuf, _lastSendPos, 0);
+			_lastSendPos = 0;
+			this->RestDTSend();// reset send time
+		}
+		return ret;
+	}
 
 	int SendData(std::shared_ptr<Netmsg_DataHeader> header)
 	{
@@ -44,6 +63,8 @@ public:
 				ret = send(_sockfd, _sendBuf, SEND_BUFF_SIZE, 0);
 				_lastSendPos = 0;
 
+				this->RestDTSend(); // reset send time
+
 				if (SOCKET_ERROR == ret)
 					break;
 			}
@@ -57,19 +78,36 @@ public:
 		return ret;
 	}
 
-	void RestLife()
+	void RestDTHeart()
 	{
-		_life = 0;
+		_dtHeart = 0;
 	}
 
-	bool CheckLife(time_t t)
+	void RestDTSend()
 	{
-		_life += t;
-		if (_life >= CLIENT_HEART_DEAD_TIME) {
-			printf("check life dead: socket=<%d>, time=%d..\n", (int)_sockfd, (int)_life);
+		_dtSend = 0;
+	}
+
+	bool CheckHeart(time_t t)
+	{
+		_dtHeart += t;
+		if (_dtHeart >= CLIENT_HEART_DEAD_TIME) {
+			printf("check heart dead: socket=<%d>, time=%d..\n", (int)_sockfd, (int)_dtHeart);
 			return true;
 		}
 		return false;
+	}
+
+	void CheckSend(time_t t)
+	{
+		_dtSend += t;
+		if (_dtSend >= CLIENT_SEND_BUFF_TIME) {
+			//printf("check send: socket=<%d>, time=%d..\n", (int)_sockfd, (int)_dtSend);
+			// 立即发送缓冲区数据
+			this->SendDataImmediate();
+			// 重置发送计时
+			this->RestDTSend();
+		}
 	}
 
 private:
@@ -78,5 +116,6 @@ private:
 	int _lastPos = 0;
 	char _sendBuf[SEND_BUFF_SIZE] = {};
 	int _lastSendPos = 0;
-	time_t _life;
+	time_t _dtHeart;
+	time_t _dtSend;// last send msg time
 };

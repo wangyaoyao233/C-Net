@@ -122,7 +122,8 @@ public:
 		_oldTime = now;
 
 		for (auto iter = _clients.begin(); iter != _clients.end();) {
-			if (iter->second->CheckLife(t)) {				
+			// heart check
+			if (iter->second->CheckHeart(t)) {				
 				// leave event
 				if (_netEvent)
 					_netEvent->OnNetLeave(iter->second);
@@ -131,10 +132,13 @@ public:
 				auto iterOld = iter;
 				iter++;
 				_clients.erase(iterOld);
+				continue;
 			}
-			else {
-				iter++;
-			}
+
+			// send time check
+			iter->second->CheckSend(t);
+
+			iter++;
 		}
 	}
 

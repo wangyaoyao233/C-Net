@@ -37,7 +37,7 @@ public:
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 
 			// reset heart
-			client->RestLife();
+			client->RestDTHeart();
 
 			// send msg
 			auto ret = std::make_shared<Netmsg_LoginR>();
@@ -53,7 +53,7 @@ public:
 		case CMD_HEART_C2S:
 		{
 			// reset heart
-			client->RestLife();
+			client->RestDTHeart();
 
 			auto ret = std::make_shared<Netmsg_Heart_S2C>();
 			cellServer->AddSendTask(client, std::shared_ptr<Netmsg_DataHeader>(ret));

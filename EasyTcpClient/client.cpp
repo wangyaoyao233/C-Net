@@ -81,7 +81,7 @@ void ThreadSend(int id)
 				sendCnt++;
 			}
 		}
-		//std::chrono::microseconds t(10);
+		//std::chrono::microseconds t(1000);
 		//std::this_thread::sleep_for(t);
 	}
 
