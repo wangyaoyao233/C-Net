@@ -9,8 +9,15 @@
 class CellClient : public IObjectPool<CellClient, 1000>
 {
 public:
+	int id = -1;
+	int serverid = -1;
+
+public:
 	CellClient(SOCKET sockfd = INVALID_SOCKET)
 	{
+		static int n = 1;
+		id = n++;
+
 		_sockfd = sockfd;
 		memset(_msgBuf, 0, sizeof(_msgBuf));
 		_lastPos = 0;
@@ -21,6 +28,8 @@ public:
 	}
 	~CellClient()
 	{
+		printf("s=%d, CellClient %d close 1\n",serverid, id);
+
 		if (INVALID_SOCKET != _sockfd) {
 #ifdef _WIN32
 			closesocket(_sockfd);

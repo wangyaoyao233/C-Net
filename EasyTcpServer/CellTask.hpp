@@ -1,13 +1,18 @@
 #pragma once
+
+#include "TimeStamp.hpp"
+#include "Semaphore.hpp"
+
 #include <thread> // std::thread
 #include <mutex> // std::mutex
 #include <list>
 #include <functional>
-#include "TimeStamp.hpp"
-
 
 class CellTaskServer
 {
+public:
+	int _serverid = -1;
+
 public:
 	CellTaskServer() 
 	{
@@ -30,7 +35,15 @@ public:
 
 	void Close()
 	{
-		_isRun = false;
+		if (_isRun) {
+			printf("CellTaskServer %d close begin\n", _serverid);
+			_isRun = false;
+			
+			_sem.Wait(); // wait until Onrun exit
+
+			printf("CellTaskServer %d close end\n", _serverid);
+		}
+
 	}
 
 private:
@@ -55,12 +68,14 @@ private:
 			}
 			_tasks.clear();
 		}
-
+		printf("CellTaskServer %d OnRun exit\n", _serverid);
+		_sem.WakeUp();
 	}
 
 private:
 	std::list<std::function<void()>> _tasks;
 	std::list<std::function<void()>> _tasksBuf;
 	std::mutex _mutex;
-	bool _isRun;
+	bool _isRun = false;
+	Semaphore _sem;
 };

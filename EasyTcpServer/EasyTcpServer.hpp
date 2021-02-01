@@ -50,6 +50,8 @@ public:
 
 	void Close()
 	{
+		printf("EasyTcpServer, close 1\n");
+
 		if (INVALID_SOCKET != _sock) {
 			_cellServers.clear();
 
@@ -62,6 +64,8 @@ public:
 #endif // _WIN32
 			_sock = INVALID_SOCKET;
 		}
+
+		printf("EasyTcpServer, close 2\n");
 	}
 
 	int Bind(const char* ip, unsigned short port)
@@ -143,13 +147,13 @@ public:
 			}
 		}
 		min->AddClient(client);
-		OnNetJoin(client);
+		
 	}
 
 	void Start(int cellServer)
 	{
 		for (int i = 0; i < cellServer; i++) {
-			auto ser = std::make_shared<CellServer>(_sock);
+			auto ser = std::make_shared<CellServer>(i + 1);
 			_cellServers.push_back(ser);
 			// regist net event
 			ser->SetEventObj(this);

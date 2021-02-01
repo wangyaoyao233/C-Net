@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "INetEvent.hpp"
 #include "CellClient.hpp"
+#include "Semaphore.hpp"
 
 #include <vector>
 #include <map>
@@ -14,10 +15,11 @@
 class CellServer
 {
 public:
-	CellServer(SOCKET sock = INVALID_SOCKET)
+	CellServer(int id)
 	{
-		_sock = sock;
+		_id = id;
 		_netEvent = nullptr;
+		_taskServer._serverid = id;
 	}
 	~CellServer()
 	{
@@ -26,12 +28,18 @@ public:
 
 	void Close()
 	{
-		_taskServer.Close();
-		if (INVALID_SOCKET != _sock) {
+		if (_isRun) {
+			printf("CellServer %d Close begin\n", _id);
+
+			_taskServer.Close(); // close task server
+			_isRun = false;
+			_sem.Wait(); // wait until OnRun exit
+
 			_clients.clear();
 			_clientsBuffer.clear();
+
+			printf("CellServer %d Close end\n", _id);
 		}
-		_sock = INVALID_SOCKET;
 	}
 
 
@@ -40,13 +48,17 @@ public:
 		fd_set fdRead_back{};
 		int maxSock = 0;
 
-		while (IsRun())
+		while (_isRun)
 		{
 			// get client from clients buffer queue
 			if (!_clientsBuffer.empty()) {
 				std::lock_guard<std::mutex> lock(_mutex);
 				for (auto client : _clientsBuffer) {
 					_clients[client->Sockfd()] = client;
+
+					client->serverid = _id;
+					if (_netEvent)
+						_netEvent->OnNetJoin(client);
 				}
 				_clientsBuffer.clear();
 				_clientChange = true;
@@ -100,8 +112,9 @@ public:
 
 			this->ReadData(fdRead);
 			this->CheckTime();
-
 		}
+		printf("CellServer %d, OnRun exit\n", _id);
+		_sem.WakeUp();
 
 	}
 
@@ -172,10 +185,6 @@ public:
 #endif // _WIN32
 	}
 
-	bool IsRun()
-	{
-		return INVALID_SOCKET != _sock;
-	}
 
 
 	int RecvData(std::shared_ptr<CellClient> client)
@@ -223,7 +232,9 @@ public:
 
 	void Start()
 	{
-		_thread = std::thread(&CellServer::OnRun, this);
+		_isRun = true;
+		std::thread t = std::thread(&CellServer::OnRun, this);
+		t.detach();
 		_taskServer.Start();
 	}
 
@@ -246,15 +257,16 @@ public:
 
 private:
 	char _recvBuf[RECV_BUFF_SIZE] = {};
-	SOCKET _sock;
 	std::map<SOCKET, std::shared_ptr<CellClient>>_clients;
 	// clients buffer queue
 	std::vector<std::shared_ptr<CellClient>> _clientsBuffer;
-	std::mutex _mutex;
-	std::thread _thread;
-	INetEvent* _netEvent;
 	CellTaskServer _taskServer;
+	Semaphore _sem;
+	std::mutex _mutex;
+	INetEvent* _netEvent;
 	time_t _oldTime = Time::GetNowInMilliSec();
+	int _id = -1;
 	bool _clientChange = false;
+	bool _isRun = false;
 };
 

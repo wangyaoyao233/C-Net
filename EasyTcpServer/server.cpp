@@ -94,6 +94,11 @@ int main()
 
 	server->Close();
 	delete server;
+
+	while (true) {
+		Sleep(1);
+	}
 	t1.join();
+
 	return 0;
 }
