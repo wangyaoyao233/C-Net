@@ -51,6 +51,8 @@ public:
 	void Close()
 	{
 		if (INVALID_SOCKET != _sock) {
+			_cellServers.clear();
+
 			// close
 #ifdef _WIN32
 			closesocket(_sock);
@@ -86,7 +88,7 @@ public:
 			_sin.sin_addr.s_addr = INADDR_ANY;//inet_addr("127.0.0.1");
 		}	
 #endif // _WIN32
-		int ret = bind(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
+		int ret = ::bind(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 		if (SOCKET_ERROR == ret) {
 			printf("bind port = <%d> error...\n", port);
 		}

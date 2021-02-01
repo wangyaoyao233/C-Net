@@ -21,6 +21,13 @@ public:
 	}
 	~CellClient()
 	{
+		if (INVALID_SOCKET != _sockfd) {
+#ifdef _WIN32
+			closesocket(_sockfd);
+#else
+			close(_sockfd);
+#endif // _WIN32
+		}
 	}
 
 	SOCKET Sockfd() { return _sockfd; }

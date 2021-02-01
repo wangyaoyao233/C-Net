@@ -9,7 +9,10 @@
 class CellTaskServer
 {
 public:
-	CellTaskServer() {}
+	CellTaskServer() 
+	{
+		_isRun = false;
+	}
 	~CellTaskServer() {}
 
 	void AddTask(std::function<void()> task)
@@ -20,14 +23,20 @@ public:
 
 	void Start()
 	{
+		_isRun = true;
 		std::thread t(&CellTaskServer::OnRun, this);
 		t.detach();
+	}
+
+	void Close()
+	{
+		_isRun = false;
 	}
 
 private:
 	void OnRun()
 	{
-		while (true)
+		while (_isRun)
 		{
 			if (!_tasksBuf.empty()) {
 				std::lock_guard<std::mutex> lock(_mutex);
@@ -53,4 +62,5 @@ private:
 	std::list<std::function<void()>> _tasks;
 	std::list<std::function<void()>> _tasksBuf;
 	std::mutex _mutex;
+	bool _isRun;
 };

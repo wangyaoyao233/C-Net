@@ -26,24 +26,15 @@ public:
 
 	void Close()
 	{
+		_taskServer.Close();
 		if (INVALID_SOCKET != _sock) {
-			// close
-#ifdef _WIN32
-			for (auto iter : _clients) {
-				closesocket(iter.first);
-			}
-#else
-			for (auto iter : _clients) {
-				close(iter.first);
-			}
-#endif // _WIN32
 			_clients.clear();
+			_clientsBuffer.clear();
 		}
+		_sock = INVALID_SOCKET;
 	}
 
-	
-	
-	bool _clientChange = false;
+
 	bool OnRun()
 	{
 		fd_set fdRead_back{};
@@ -114,7 +105,6 @@ public:
 
 	}
 
-	time_t _oldTime = Time::GetNowInMilliSec();
 	void CheckTime()
 	{
 		auto now = Time::GetNowInMilliSec();
@@ -154,7 +144,6 @@ public:
 						_netEvent->OnNetLeave(iter->second);
 
 					_clientChange = true;
-					closesocket(iter->first);
 					_clients.erase(iter);
 				}
 			}
@@ -173,7 +162,6 @@ public:
 						_netEvent->OnNetLeave(iter.second);
 
 					_clientChange = true;
-					close(iter.first);
 					temp.push_back(iter.second);
 				}
 			}
@@ -189,7 +177,7 @@ public:
 		return INVALID_SOCKET != _sock;
 	}
 
-	char _recvBuf[RECV_BUFF_SIZE] = {};
+
 	int RecvData(std::shared_ptr<CellClient> client)
 	{
 		// recvbuf	
@@ -257,6 +245,7 @@ public:
 	}
 
 private:
+	char _recvBuf[RECV_BUFF_SIZE] = {};
 	SOCKET _sock;
 	std::map<SOCKET, std::shared_ptr<CellClient>>_clients;
 	// clients buffer queue
@@ -265,5 +254,7 @@ private:
 	std::thread _thread;
 	INetEvent* _netEvent;
 	CellTaskServer _taskServer;
+	time_t _oldTime = Time::GetNowInMilliSec();
+	bool _clientChange = false;
 };
 
