@@ -1,28 +1,36 @@
 #pragma once
 #include <chrono>
 #include <thread>
+#include <condition_variable>
 
 class Semaphore
 {
 public:
 
+	// 阻塞当前线程
 	void Wait()
 	{
-		_isWaitExit = true;
-		while (_isWaitExit)// 阻塞等待 OnRun退出
-		{// 信号量
-			std::chrono::milliseconds t(1);
-			std::this_thread::sleep_for(t);
+		std::unique_lock<std::mutex> lock(_mutex);
+		if (--_wait < 0) {
+			_cv.wait(lock, [&]() {
+				return _wakeup > 0;
+				});
+			--_wakeup;
 		}
 	}
 
+	// 唤醒当前线程
 	void WakeUp()
 	{
-		if (_isWaitExit)
-			_isWaitExit = false;
-		else
-			printf("Semaphore WakeUp error..\n");
+		std::lock_guard<std::mutex> lock(_mutex);
+		if (++_wait <= 0) {
+			++_wakeup;
+			_cv.notify_one();
+		}			
 	}
 private:
-	bool _isWaitExit = false;
+	std::condition_variable _cv;
+	std::mutex _mutex;
+	int _wait = 0;
+	int _wakeup = 0;
 };
