@@ -147,6 +147,7 @@
     <ClInclude Include="CellClient.hpp" />
     <ClInclude Include="CellServer.hpp" />
     <ClInclude Include="CellTask.hpp" />
+    <ClInclude Include="CellThread.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="EasyTcpServer.hpp" />
     <ClInclude Include="INetEvent.hpp" />

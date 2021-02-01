@@ -3,7 +3,7 @@
 #include "Common.h"
 #include "INetEvent.hpp"
 #include "CellClient.hpp"
-#include "Semaphore.hpp"
+#include "CellThread.h"
 
 #include <vector>
 #include <map>
@@ -28,27 +28,27 @@ public:
 
 	void Close()
 	{
-		if (_isRun) {
 			printf("CellServer %d Close begin\n", _id);
 
 			_taskServer.Close(); // close task server
-			_isRun = false;
-			_sem.Wait(); // wait until OnRun exit
-
-			_clients.clear();
-			_clientsBuffer.clear();
+			_thread.Close();
 
 			printf("CellServer %d Close end\n", _id);
-		}
+	}
+
+	void ClearClients()
+	{
+		_clients.clear();
+		_clientsBuffer.clear();
 	}
 
 
-	bool OnRun()
+	void OnRun(CellThread* pThread)
 	{
 		fd_set fdRead_back{};
 		int maxSock = 0;
 
-		while (_isRun)
+		while (pThread->IsRun())
 		{
 			// get client from clients buffer queue
 			if (!_clientsBuffer.empty()) {
@@ -101,9 +101,9 @@ public:
 			/// <returns></returns>
 			int ret = select(maxSock + 1, &fdRead, nullptr, nullptr, nullptr);
 			if (ret < 0) {
-				printf("select quit..\n");
-				Close();
-				return false;
+				printf("CellServer. OnRun. select quit..\n");
+				pThread->Exit();
+				break;
 			}
 			else if (ret == 0) {
 				continue;
@@ -114,7 +114,6 @@ public:
 			this->CheckTime();
 		}
 		printf("CellServer %d, OnRun exit\n", _id);
-		_sem.WakeUp();
 
 	}
 
@@ -232,10 +231,15 @@ public:
 
 	void Start()
 	{
-		_isRun = true;
-		std::thread t = std::thread(&CellServer::OnRun, this);
-		t.detach();
 		_taskServer.Start();
+
+		_thread.Start(nullptr, // onCreate
+			[this](CellThread* t) {// onRun
+				OnRun(t);
+			},
+			[this](CellThread* t) { // onClose
+				ClearClients();
+			});
 	}
 
 	size_t GetClientCount()
@@ -261,12 +265,11 @@ private:
 	// clients buffer queue
 	std::vector<std::shared_ptr<CellClient>> _clientsBuffer;
 	CellTaskServer _taskServer;
-	Semaphore _sem;
+	CellThread _thread;
 	std::mutex _mutex;
 	INetEvent* _netEvent;
 	time_t _oldTime = Time::GetNowInMilliSec();
 	int _id = -1;
 	bool _clientChange = false;
-	bool _isRun = false;
 };
 

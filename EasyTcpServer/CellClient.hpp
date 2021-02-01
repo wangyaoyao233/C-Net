@@ -44,7 +44,7 @@ public:
 	int GetLastPos() { return _lastPos; }
 	void SetLastPos(int pos) { _lastPos = pos; }
 
-	int SendDataImmediate(std::shared_ptr<Netmsg_DataHeader> header)
+	void SendDataImmediate(std::shared_ptr<Netmsg_DataHeader> header)
 	{
 		this->SendData(header);
 		this->SendDataImmediate();

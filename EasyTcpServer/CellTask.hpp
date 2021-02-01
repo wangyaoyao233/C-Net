@@ -1,7 +1,7 @@
 #pragma once
 
 #include "TimeStamp.hpp"
-#include "Semaphore.hpp"
+#include "CellThread.h"
 
 #include <thread> // std::thread
 #include <mutex> // std::mutex
@@ -14,10 +14,7 @@ public:
 	int _serverid = -1;
 
 public:
-	CellTaskServer() 
-	{
-		_isRun = false;
-	}
+	CellTaskServer() {}
 	~CellTaskServer() {}
 
 	void AddTask(std::function<void()> task)
@@ -28,28 +25,22 @@ public:
 
 	void Start()
 	{
-		_isRun = true;
-		std::thread t(&CellTaskServer::OnRun, this);
-		t.detach();
+		_thread.Start(nullptr, 
+			[&](CellThread* t) {
+				OnRun(t);
+			},
+			nullptr);
 	}
 
 	void Close()
 	{
-		if (_isRun) {
-			printf("CellTaskServer %d close begin\n", _serverid);
-			_isRun = false;
-			
-			_sem.Wait(); // wait until Onrun exit
-
-			printf("CellTaskServer %d close end\n", _serverid);
-		}
-
+		_thread.Close();
 	}
 
 private:
-	void OnRun()
+	void OnRun(CellThread* pThread)
 	{
-		while (_isRun)
+		while (pThread->IsRun())
 		{
 			if (!_tasksBuf.empty()) {
 				std::lock_guard<std::mutex> lock(_mutex);
@@ -69,13 +60,11 @@ private:
 			_tasks.clear();
 		}
 		printf("CellTaskServer %d OnRun exit\n", _serverid);
-		_sem.WakeUp();
 	}
 
 private:
 	std::list<std::function<void()>> _tasks;
 	std::list<std::function<void()>> _tasksBuf;
+	CellThread _thread;
 	std::mutex _mutex;
-	bool _isRun = false;
-	Semaphore _sem;
 };

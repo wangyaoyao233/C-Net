@@ -5,6 +5,7 @@
 #include "CellClient.hpp"
 #include "CellServer.hpp"
 #include "INetEvent.hpp"
+#include "CellThread.h"
 
 
 #include <vector>
@@ -51,6 +52,8 @@ public:
 	void Close()
 	{
 		printf("EasyTcpServer, close 1\n");
+
+		_thread.Close();
 
 		if (INVALID_SOCKET != _sock) {
 			_cellServers.clear();
@@ -160,12 +163,17 @@ public:
 			// start client msg process thread
 			ser->Start();
 		}
+		
+		_thread.Start(nullptr,
+			[this](CellThread* t) {
+				OnRun(t);
+			},nullptr);
 	}
 
 
-	bool OnRun()
+	void OnRun(CellThread* pThread)
 	{
-		if (IsRun()) {
+		while (pThread->IsRun()) {
 			this->TimeForMsg();
 			// select
 			fd_set fdRead{};
@@ -179,9 +187,9 @@ public:
 			/// <returns></returns>
 			int ret = select(_sock + 1, &fdRead, nullptr, nullptr, &t);
 			if (ret < 0) {
-				printf("accpet select quit..\n");
-				Close();
-				return false;
+				printf("EasyTcpServer. OnRun. select quit..\n");
+				pThread->Exit();
+				break;
 			}
 
 			// accept
@@ -189,13 +197,8 @@ public:
 				FD_CLR(_sock, &fdRead);
 
 				this->Accept();
-				// all clients connected, to recv data
-				return true;
 			}
-
-			return true;
 		}
-		return false;
 	}
 
 	bool IsRun()
@@ -235,9 +238,10 @@ public:
 	}
 
 private:
-	SOCKET _sock;
 	std::vector<std::shared_ptr<CellServer>> _cellServers;
+	CellThread _thread;
 	TimeStamp _time;
+	SOCKET _sock;
 
 protected:
 	std::atomic<int> _msgCnt;

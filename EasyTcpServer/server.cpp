@@ -4,19 +4,6 @@
 
 using namespace std;
 bool g_Run = true;
-void ThreadCmd()
-{
-	while (true)
-	{
-		char cmdBuf[256];
-		cin >> cmdBuf;
-
-		if (0 == strcmp(cmdBuf, "exit")) {
-			g_Run = false;
-			break;
-		}
-	}
-}
 
 class MyServer :public EasyTcpServer
 {
@@ -85,16 +72,19 @@ int main()
 	server->Listen(5);
 	server->Start(4);
 
-	std::thread t1(ThreadCmd);
-
 	while (g_Run)
 	{
-		server->OnRun();		
+		char cmdBuf[256];
+		cin >> cmdBuf;
+
+		if (0 == strcmp(cmdBuf, "exit")) {
+			g_Run = false;
+			break;
+		}
 	}
 
 	server->Close();
 	delete server;
-	t1.join();
 
 	return 0;
 }
