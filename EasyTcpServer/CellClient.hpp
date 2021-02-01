@@ -2,6 +2,8 @@
 
 #include "Common.h"
 
+#define CLIENT_HEART_DEAD_TIME 5000
+
 // client class
 class CellClient : public IObjectPool<CellClient, 1000>
 {
@@ -13,6 +15,8 @@ public:
 		_lastPos = 0;
 		memset(_sendBuf, 0, sizeof(_sendBuf));
 		_lastSendPos = 0;
+
+		this->RestLife();
 	}
 	~CellClient()
 	{
@@ -53,10 +57,26 @@ public:
 		return ret;
 	}
 
+	void RestLife()
+	{
+		_life = 0;
+	}
+
+	bool CheckLife(time_t t)
+	{
+		_life += t;
+		if (_life >= CLIENT_HEART_DEAD_TIME) {
+			printf("check life dead: socket=<%d>, time=%d..\n", (int)_sockfd, (int)_life);
+			return true;
+		}
+		return false;
+	}
+
 private:
 	SOCKET _sockfd; // fd_set file desc set
 	char _msgBuf[RECV_BUFF_SIZE * 5] = {}; // the 2nd buffer
 	int _lastPos = 0;
 	char _sendBuf[SEND_BUFF_SIZE] = {};
 	int _lastSendPos = 0;
+	time_t _life;
 };

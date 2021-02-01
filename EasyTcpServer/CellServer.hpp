@@ -41,12 +41,12 @@ public:
 		}
 	}
 
-
-
+	
+	
+	bool _clientChange = false;
 	bool OnRun()
 	{
 		fd_set fdRead_back{};
-		bool clientChange = false;
 		int maxSock = 0;
 
 		while (IsRun())
@@ -58,12 +58,15 @@ public:
 					_clients[client->Sockfd()] = client;
 				}
 				_clientsBuffer.clear();
-				clientChange = true;
+				_clientChange = true;
 			}
 			// if no client
 			if (_clients.empty()) {
 				std::chrono::microseconds t(1);
 				std::this_thread::sleep_for(t);
+
+				_oldTime = Time::GetNowInMilliSec();
+
 				continue;
 			}
 
@@ -71,8 +74,8 @@ public:
 			fd_set fdRead{};
 			FD_ZERO(&fdRead);
 
-			if (clientChange) {
-				clientChange = false;
+			if (_clientChange) {
+				_clientChange = false;
 				// add socket to fd_set
 				maxSock = _clients.begin()->first;
 				for (auto iter : _clients) {
@@ -103,46 +106,78 @@ public:
 				continue;
 			}
 
-#ifdef _WIN32
-			for (int i = 0; i < fdRead.fd_count; i++) {
-				auto iter = _clients.find(fdRead.fd_array[i]);
-				if (iter != _clients.end()) {
-					if (-1 == this->RecvData(iter->second)) {
-						// leave event
-						if (_netEvent)
-							_netEvent->OnNetLeave(iter->second);
 
-						clientChange = true;
-						_clients.erase(iter->first);
-					}
-				}
-				else {
-					printf("error..iter == _clients.end()\n");
-				}
-			}
-#else
-			std::vector<std::shared_ptr<ClientSocket>> temp;
-			for (auto iter : _clients)
-			{
-				if (FD_ISSET(iter.first, &fdRead)) {
-					if (-1 == this->RecvData(iter.second)) {
-						// leave event
-						if (_netEvent)
-							_netEvent->OnNetLeave(iter.second);
-
-						_clientChange = true;
-						temp.push_back(iter.second);
-					}
-				}
-			}
-			for (auto client : temp) {
-				_clients.erase(client->Sockfd());
-			}
-#endif // _WIN32
-
+			this->ReadData(fdRead);
+			this->CheckTime();
 
 		}
 
+	}
+
+	time_t _oldTime = Time::GetNowInMilliSec();
+	void CheckTime()
+	{
+		auto now = Time::GetNowInMilliSec();
+		auto t = now - _oldTime;
+		_oldTime = now;
+
+		for (auto iter = _clients.begin(); iter != _clients.end();) {
+			if (iter->second->CheckLife(t)) {				
+				// leave event
+				if (_netEvent)
+					_netEvent->OnNetLeave(iter->second);
+
+				_clientChange = true;
+				auto iterOld = iter;
+				iter++;
+				_clients.erase(iterOld);
+			}
+			else {
+				iter++;
+			}
+		}
+	}
+
+	void ReadData(fd_set& fdRead)
+	{
+#ifdef _WIN32
+		for (int i = 0; i < fdRead.fd_count; i++) {
+			auto iter = _clients.find(fdRead.fd_array[i]);
+			if (iter != _clients.end()) {
+				if (-1 == this->RecvData(iter->second)) {
+					// leave event
+					if (_netEvent)
+						_netEvent->OnNetLeave(iter->second);
+
+					_clientChange = true;
+					closesocket(iter->first);
+					_clients.erase(iter);
+				}
+			}
+			else {
+				printf("error..iter == _clients.end()\n");
+			}
+		}
+#else
+		std::vector<std::shared_ptr<ClientSocket>> temp;
+		for (auto iter : _clients)
+		{
+			if (FD_ISSET(iter.first, &fdRead)) {
+				if (-1 == this->RecvData(iter.second)) {
+					// leave event
+					if (_netEvent)
+						_netEvent->OnNetLeave(iter.second);
+
+					_clientChange = true;
+					close(iter.first);
+					temp.push_back(iter.second);
+				}
+			}
+		}
+		for (auto client : temp) {
+			_clients.erase(client->Sockfd());
+		}
+#endif // _WIN32
 	}
 
 	bool IsRun()

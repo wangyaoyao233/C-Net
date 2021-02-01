@@ -47,6 +47,15 @@ public:
 		{
 		}
 		break;
+		case CMD_HEART_C2S:
+		{
+			// reset heart
+			client->RestLife();
+
+			auto ret = std::make_shared<Netmsg_Heart_S2C>();
+			cellServer->AddSendTask(client, std::shared_ptr<Netmsg_DataHeader>(ret));
+		}
+		break;
 		default:
 		{
 		}

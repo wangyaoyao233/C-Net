@@ -8,12 +8,11 @@
 
 class CellTaskServer
 {
-	typedef std::function<void()> CellTask;
 public:
 	CellTaskServer() {}
 	~CellTaskServer() {}
 
-	void AddTask(CellTask task)
+	void AddTask(std::function<void()> task)
 	{
 		std::lock_guard<std::mutex> lock(_mutex);
 		_tasksBuf.push_back(task);
@@ -51,7 +50,7 @@ private:
 	}
 
 private:
-	std::list<CellTask> _tasks;
-	std::list<CellTask> _tasksBuf;
+	std::list<std::function<void()>> _tasks;
+	std::list<std::function<void()>> _tasksBuf;
 	std::mutex _mutex;
 };

@@ -2,6 +2,17 @@
 #include <chrono>
 
 using namespace std::chrono;
+
+class Time
+{
+public:
+	// 获取当前时间戳(milli seconds)
+	static time_t GetNowInMilliSec()
+	{
+		return duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
+	}
+};
+
 class TimeStamp
 {
 public:
