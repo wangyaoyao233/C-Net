@@ -68,7 +68,7 @@ void ThreadSend(int id)
 	std::thread tr(ThreadRecv, begin, end);
 	tr.detach();
 
-	Login login[mCount];
+	Netmsg_Login login[mCount];
 	for (int i = 0; i < mCount; i++) {
 		strcpy(login[i].userName, "client");
 		strcpy(login[i].password, "4567");

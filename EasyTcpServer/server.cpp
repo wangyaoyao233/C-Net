@@ -36,6 +36,9 @@ public:
 			//Login* login = (Login*)header;
 			//printf("client<%d> Login: userName = %s, passWord = %s\n", (int)cSock, login->userName, login->password);
 
+			// reset heart
+			client->RestLife();
+
 			// send msg
 			auto ret = std::make_shared<Netmsg_LoginR>();
 			ret->result = 1;

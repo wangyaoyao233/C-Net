@@ -148,9 +148,9 @@ public:
 		memcpy(_msgBuf + _lastPos, _recvBuf, len);
 		_lastPos += len;
 
-		while(_lastPos >= sizeof(DataHeader)){
+		while(_lastPos >= sizeof(Netmsg_DataHeader)){
 			// recvbuf  to header
-			DataHeader* header = (DataHeader*)_msgBuf;
+			Netmsg_DataHeader* header = (Netmsg_DataHeader*)_msgBuf;
 			if (_lastPos >= header->dataLen) {
 				int size = _lastPos - header->dataLen;
 				OnNetMsg(header);
@@ -165,7 +165,7 @@ public:
 		return 0;
 	}
 
-	void OnNetMsg(DataHeader* header)
+	void OnNetMsg(Netmsg_DataHeader* header)
 	{
 		switch (header->cmd)
 		{
@@ -197,7 +197,7 @@ public:
 
 
 	// send data
-	int SendData(DataHeader* header, int len)
+	int SendData(Netmsg_DataHeader* header, int len)
 	{
 		int ret = SOCKET_ERROR;
 		if (IsRun() && header) {
